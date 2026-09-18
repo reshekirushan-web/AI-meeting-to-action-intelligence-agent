@@ -1,4 +1,4 @@
-````python
+
 import streamlit as st
 from google import genai
 import os
@@ -348,4 +348,3 @@ if "meeting_data" in st.session_state:
         file_name="meeting_tasks_and_promises.txt",
         mime="text/plain"
     )
-````
