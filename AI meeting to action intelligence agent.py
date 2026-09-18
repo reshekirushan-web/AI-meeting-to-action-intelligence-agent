@@ -118,6 +118,90 @@ st.markdown(
 
 
 
+
+# ============================================================
+# LOGIN / AUTHENTICATION
+# ============================================================
+
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+
+    st.title("🔐 NEON MEETING AI")
+    st.subheader("Secure Login")
+
+    st.write("Please sign in to access the meeting intelligence system.")
+
+    with st.container(border=True):
+
+        username = st.text_input(
+            "USERNAME",
+            placeholder="Enter your username"
+        )
+
+        password = st.text_input(
+            "PASSWORD",
+            type="password",
+            placeholder="Enter your password"
+        )
+
+        if st.button(
+            "🔓 LOGIN",
+            type="primary",
+            use_container_width=True
+        ):
+
+            # For deployment, set AUTH_USERNAME and AUTH_PASSWORD
+            # in Streamlit Secrets or environment variables.
+            valid_username = os.environ.get("AUTH_USERNAME")
+            valid_password = os.environ.get("AUTH_PASSWORD")
+
+            if not valid_username:
+                try:
+                    valid_username = st.secrets["AUTH_USERNAME"]
+                except Exception:
+                    valid_username = "admin"
+
+            if not valid_password:
+                try:
+                    valid_password = st.secrets["AUTH_PASSWORD"]
+                except Exception:
+                    valid_password = "admin123"
+
+            if (
+                username == valid_username
+                and password == valid_password
+            ):
+                st.session_state.authenticated = True
+                st.session_state.page = 1
+                st.rerun()
+            else:
+                st.error("❌ Invalid username or password.")
+
+    st.info(
+        "Demo login: username `admin` • password `admin123` "
+        "unless you configure AUTH_USERNAME and AUTH_PASSWORD."
+    )
+
+    st.stop()
+
+
+# ============================================================
+# LOGOUT
+# ============================================================
+
+with st.sidebar:
+    st.write("### 👤 SESSION")
+    st.success("Logged in")
+
+    if st.button("🚪 LOGOUT", use_container_width=True):
+        st.session_state.authenticated = False
+        st.session_state.meeting_data = None
+        st.session_state.audio_name = None
+        st.session_state.page = 1
+        st.rerun()
+
 # ============================================================
 # GEMINI API CONFIGURATION
 # ============================================================
