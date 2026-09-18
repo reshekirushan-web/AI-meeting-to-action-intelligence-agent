@@ -1,3 +1,4 @@
+
 import streamlit as st
 import os
 import json
@@ -10,8 +11,8 @@ from google import genai
 # ============================================================
 
 st.set_page_config(
-    page_title="The Tarnished Archive",
-    page_icon="⚔️",
+    page_title="Neon Meeting AI",
+    page_icon="💠",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -30,9 +31,9 @@ if not api_key:
         api_key = None
 
 if not api_key:
-    st.error("⚠️ The Sacred Key is missing.")
+    st.error("GEMINI_API_KEY is not configured.")
     st.info(
-        "Add GEMINI_API_KEY to your Streamlit Secrets."
+        "Please add GEMINI_API_KEY to your Streamlit Secrets."
     )
     st.stop()
 
@@ -55,261 +56,327 @@ if "audio_name" not in st.session_state:
 
 
 # ============================================================
-# PAGE 1 — THE ARCHIVE
+# PAGE 1 — HOME
 # ============================================================
 
 if st.session_state.page == 1:
 
-    st.title("⚔️ THE TARNISHED ARCHIVE")
+    st.title("💠 NEON MEETING AI")
 
     st.subheader(
         "AI MEETING TO ACTION INTELLIGENCE"
     )
 
-    st.write(
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    )
-
-    st.markdown(
-        """
-        ### 🕯️ Chronicle the words. Reveal the actions.
-
-        Transform meeting recordings into structured intelligence.
-
-        The Archive listens to the voices within your meeting and
-        uncovers **tasks, promises, deadlines and decisions** hidden
-        within the conversation.
-        """
+    st.caption(
+        "Turn conversations into structured actions."
     )
 
     st.write("")
 
     # ========================================================
-    # MAIN FEATURES
+    # HERO PANEL
     # ========================================================
 
-    st.subheader("𒀭 WHAT THE ARCHIVE SHALL REVEAL")
+    with st.container(border=True):
+
+        st.subheader(
+            "⚡ CONVERSATION → INTELLIGENCE"
+        )
+
+        st.write(
+            """
+            Transform meeting recordings into actionable
+            intelligence using Gemini AI.
+            """
+        )
+
+        st.info(
+            "Upload a meeting recording and let AI discover "
+            "tasks, promises, deadlines and decisions."
+        )
+
+    st.write("")
+
+    # ========================================================
+    # FEATURES
+    # ========================================================
+
+    st.subheader("🔷 CORE INTELLIGENCE")
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
 
-        st.metric(
-            label="⚔️ TASKS",
-            value="01"
-        )
+        with st.container(border=True):
 
-        st.write(
-            "Assignments spoken during the meeting."
-        )
+            st.metric(
+                "⚡ TASKS",
+                "01"
+            )
+
+            st.write(
+                "Identifies tasks assigned during the meeting."
+            )
 
     with col2:
 
-        st.metric(
-            label="🤝 OATHS",
-            value="02"
-        )
+        with st.container(border=True):
 
-        st.write(
-            "Promises and commitments made by speakers."
-        )
+            st.metric(
+                "🔗 PROMISES",
+                "02"
+            )
+
+            st.write(
+                "Detects promises and commitments."
+            )
 
     with col3:
 
-        st.metric(
-            label="⌛ DEADLINES",
-            value="03"
+        with st.container(border=True):
+
+            st.metric(
+                "◈ DEADLINES",
+                "03"
+            )
+
+            st.write(
+                "Extracts deadlines and important dates."
+            )
+
+    st.write("")
+
+    # ========================================================
+    # HOW IT WORKS
+    # ========================================================
+
+    st.subheader("🚀 INTELLIGENCE PIPELINE")
+
+    step1, step2, step3 = st.columns(3)
+
+    with step1:
+
+        with st.container(border=True):
+
+            st.write("### 01")
+            st.write("🎙️ **UPLOAD**")
+
+            st.caption(
+                "Provide your meeting recording."
+            )
+
+    with step2:
+
+        with st.container(border=True):
+
+            st.write("### 02")
+            st.write("🧠 **ANALYZE**")
+
+            st.caption(
+                "Gemini processes the conversation."
+            )
+
+    with step3:
+
+        with st.container(border=True):
+
+            st.write("### 03")
+            st.write("⚡ **ACT**")
+
+            st.caption(
+                "Receive structured actionable intelligence."
+            )
+
+    st.write("")
+
+    # ========================================================
+    # START
+    # ========================================================
+
+    with st.container(border=True):
+
+        st.subheader(
+            "🔮 READY TO ANALYZE?"
         )
 
         st.write(
-            "Dates and time-bound obligations."
+            "Begin your meeting intelligence session."
         )
 
-    st.write("")
+        if st.button(
+            "⚡ START ANALYSIS →",
+            type="primary",
+            use_container_width=True
+        ):
 
-    # ========================================================
-    # ARCHIVE DESCRIPTION
-    # ========================================================
-
-    with st.container():
-
-        st.subheader("📜 THE PURPOSE")
-
-        st.info(
-            "Upload a meeting recording. "
-            "The intelligence agent shall examine the conversation "
-            "and forge it into actionable information."
-        )
-
-    st.write("")
-
-    # ========================================================
-    # JOURNEY
-    # ========================================================
-
-    st.subheader("🗺️ THE JOURNEY")
-
-    journey1, journey2, journey3 = st.columns(3)
-
-    with journey1:
-
-        st.write("### I")
-        st.write("🎙️ **OFFER THE RECORDING**")
-        st.caption(
-            "Provide the meeting voice to the Archive."
-        )
-
-    with journey2:
-
-        st.write("### II")
-        st.write("👁️ **THE ARCHIVE LISTENS**")
-        st.caption(
-            "Gemini examines the spoken conversation."
-        )
-
-    with journey3:
-
-        st.write("### III")
-        st.write("⚔️ **CLAIM THE INTELLIGENCE**")
-        st.caption(
-            "Tasks, promises and deadlines are revealed."
-        )
-
-    st.write("")
-
-    if st.button(
-        "⚔️ ENTER THE ARCHIVE",
-        type="primary",
-        use_container_width=True
-    ):
-
-        st.session_state.page = 2
-        st.rerun()
+            st.session_state.page = 2
+            st.rerun()
 
 
 # ============================================================
-# PAGE 2 — AUDIO CHAMBER
+# PAGE 2 — UPLOAD
 # ============================================================
 
 elif st.session_state.page == 2:
 
-    st.title("🎙️ THE CHAMBER OF VOICES")
+    st.title("🎙️ AUDIO INTELLIGENCE")
 
     st.subheader(
-        "Offer your meeting recording to the Archive"
+        "Upload your meeting recording"
     )
-
-    st.write(
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    )
-
-    # ========================================================
-    # JOURNEY PROGRESS
-    # ========================================================
-
-    st.progress(0.66)
 
     st.caption(
-        "⚔️ JOURNEY — II / III"
+        "STEP 02 / 03"
     )
+
+    st.progress(0.66)
 
     st.write("")
 
     # ========================================================
-    # AUDIO UPLOAD
+    # UPLOAD PANEL
     # ========================================================
 
-    st.subheader("📜 PRESENT THE RECORDING")
+    with st.container(border=True):
 
-    audio = st.file_uploader(
-        "Choose a meeting recording",
-        type=["mp3", "wav", "m4a"],
-        help="Supported formats: MP3, WAV and M4A."
-    )
+        st.subheader(
+            "💠 RECORDING INPUT"
+        )
+
+        st.write(
+            "Choose an MP3, WAV or M4A meeting recording."
+        )
+
+        audio = st.file_uploader(
+            "UPLOAD AUDIO",
+            type=["mp3", "wav", "m4a"],
+            help="Supported formats: MP3, WAV and M4A."
+        )
+
+    # ========================================================
+    # AUDIO EXISTS
+    # ========================================================
 
     if audio is not None:
 
         st.session_state.audio_name = audio.name
 
-        st.success(
-            f"✓ The recording has been accepted: {audio.name}"
+        st.write("")
+
+        # ====================================================
+        # FILE ACCEPTED
+        # ====================================================
+
+        with st.container(border=True):
+
+            st.success(
+                f"✓ AUDIO READY — {audio.name}"
+            )
+
+            st.audio(audio)
+
+        st.write("")
+
+        # ====================================================
+        # FILE INFORMATION
+        # ====================================================
+
+        st.subheader(
+            "📊 RECORDING DATA"
         )
 
-        st.write("")
-
-        # ====================================================
-        # AUDIO PLAYER
-        # ====================================================
-
-        st.subheader("🔊 THE VOICE")
-
-        st.audio(audio)
-
-        st.write("")
-
-        # ====================================================
-        # RECORDING INFORMATION
-        # ====================================================
-
-        st.subheader("🛡️ RECORDING INSCRIPTION")
-
         file_size_mb = (
-            len(audio.getbuffer()) /
-            (1024 * 1024)
+            len(audio.getbuffer())
+            / (1024 * 1024)
         )
 
         col1, col2, col3 = st.columns(3)
 
         with col1:
 
-            st.metric(
-                "📜 FILE",
-                audio.name
-            )
+            with st.container(border=True):
+
+                st.metric(
+                    "📁 FILE",
+                    audio.name
+                )
 
         with col2:
 
-            st.metric(
-                "💾 SIZE",
-                f"{file_size_mb:.2f} MB"
-            )
+            with st.container(border=True):
+
+                st.metric(
+                    "💾 SIZE",
+                    f"{file_size_mb:.2f} MB"
+                )
 
         with col3:
 
-            st.metric(
-                "🎧 FORMAT",
-                audio.name.split(".")[-1].upper()
-            )
+            with st.container(border=True):
+
+                st.metric(
+                    "🎧 FORMAT",
+                    audio.name.split(".")[-1].upper()
+                )
 
         st.write("")
 
         # ====================================================
-        # ANALYSIS SECTION
+        # ANALYSIS TARGETS
         # ====================================================
 
-        with st.expander(
-            "🕯️ What will the Archive seek?",
-            expanded=True
-        ):
+        with st.container(border=True):
 
-            st.write(
-                "The intelligence agent will search the recording for:"
+            st.subheader(
+                "🧠 AI ANALYSIS TARGETS"
             )
 
-            st.write("⚔️ Tasks assigned to people")
-            st.write("🤝 Promises and commitments")
-            st.write("⌛ Deadlines")
-            st.write("💡 Important decisions")
-            st.write("📜 A concise meeting summary")
+            target1, target2 = st.columns(2)
+
+            with target1:
+
+                st.write(
+                    "⚡ **TASKS**"
+                )
+
+                st.caption(
+                    "Assigned actions and responsibilities."
+                )
+
+                st.write(
+                    "🔗 **PROMISES**"
+                )
+
+                st.caption(
+                    "Commitments made by participants."
+                )
+
+            with target2:
+
+                st.write(
+                    "◈ **DEADLINES**"
+                )
+
+                st.caption(
+                    "Important dates and time limits."
+                )
+
+                st.write(
+                    "💡 **DECISIONS**"
+                )
+
+                st.caption(
+                    "Important decisions made during the meeting."
+                )
 
         st.write("")
 
         # ====================================================
-        # ANALYZE BUTTON
+        # ANALYZE
         # ====================================================
 
         if st.button(
-            "⚔️ BEGIN THE ANALYSIS",
+            "🧠 ANALYZE MEETING",
             type="primary",
             use_container_width=True
         ):
@@ -323,11 +390,11 @@ elif st.session_state.page == 2:
             try:
 
                 # ==================================================
-                # STEP 1 — SAVE AUDIO
+                # SAVE AUDIO
                 # ==================================================
 
                 status.info(
-                    "🕯️ Preparing the recording..."
+                    "⚡ Preparing audio..."
                 )
 
                 progress.progress(15)
@@ -366,11 +433,11 @@ elif st.session_state.page == 2:
                 )
 
                 # ==================================================
-                # STEP 2 — UPLOAD
+                # UPLOAD TO GEMINI
                 # ==================================================
 
                 status.info(
-                    "📜 Sending the recording into the Archive..."
+                    "📡 Sending audio to Gemini..."
                 )
 
                 progress.progress(30)
@@ -380,11 +447,11 @@ elif st.session_state.page == 2:
                 )
 
                 # ==================================================
-                # STEP 3 — ANALYZE
+                # AI ANALYSIS
                 # ==================================================
 
                 status.info(
-                    "👁️ The intelligence agent is listening..."
+                    "🧠 AI is analyzing the conversation..."
                 )
 
                 progress.progress(45)
@@ -470,11 +537,11 @@ If there are no important decisions, return an empty decisions array.
                 progress.progress(75)
 
                 status.info(
-                    "⚔️ Forging the final intelligence..."
+                    "⚡ Forging the intelligence report..."
                 )
 
                 # ==================================================
-                # GET RESPONSE
+                # RESPONSE
                 # ==================================================
 
                 result_text = (
@@ -482,7 +549,7 @@ If there are no important decisions, return an empty decisions array.
                 )
 
                 # ==================================================
-                # CLEAN RESPONSE
+                # CLEAN JSON
                 # ==================================================
 
                 if result_text.startswith("```json"):
@@ -504,16 +571,12 @@ If there are no important decisions, return an empty decisions array.
                     ].strip()
 
                 # ==================================================
-                # JSON
+                # PARSE
                 # ==================================================
 
                 meeting_data = json.loads(
                     result_text
                 )
-
-                # ==================================================
-                # VALIDATION
-                # ==================================================
 
                 if "summary" not in meeting_data:
 
@@ -540,26 +603,17 @@ If there are no important decisions, return an empty decisions array.
                 progress.progress(100)
 
                 status.success(
-                    "⚔️ The Archive has revealed its findings."
+                    "✓ ANALYSIS COMPLETE"
                 )
 
                 st.session_state.page = 3
 
                 st.rerun()
 
-            # ======================================================
-            # JSON ERROR
-            # ======================================================
-
             except json.JSONDecodeError:
 
                 st.error(
-                    "⚠️ The returned intelligence could not "
-                    "be interpreted."
-                )
-
-                st.write(
-                    "Raw intelligence:"
+                    "⚠️ AI returned invalid JSON."
                 )
 
                 st.code(
@@ -568,26 +622,18 @@ If there are no important decisions, return an empty decisions array.
                     else "No response received."
                 )
 
-            # ======================================================
-            # GENERAL ERROR
-            # ======================================================
-
             except Exception as e:
 
                 st.error(
-                    "⚠️ The Archive encountered an error."
+                    "⚠️ Analysis failed."
                 )
 
                 st.info(
-                    "Check your Gemini API key, audio file "
-                    "and Gemini API access."
+                    "Check your Gemini API key, "
+                    "audio file and API access."
                 )
 
                 st.exception(e)
-
-            # ======================================================
-            # CLEAN TEMP FILE
-            # ======================================================
 
             finally:
 
@@ -604,14 +650,18 @@ If there are no important decisions, return an empty decisions array.
 
     else:
 
-        st.warning(
-            "🕯️ No recording has been offered yet."
-        )
+        st.write("")
+
+        with st.container(border=True):
+
+            st.info(
+                "🎙️ Upload a meeting recording to begin."
+            )
 
     st.write("")
 
     if st.button(
-        "← RETURN TO THE ARCHIVE"
+        "← BACK TO HOME"
     ):
 
         st.session_state.page = 1
@@ -619,37 +669,33 @@ If there are no important decisions, return an empty decisions array.
 
 
 # ============================================================
-# PAGE 3 — THE REVELATION
+# PAGE 3 — RESULTS
 # ============================================================
 
 elif st.session_state.page == 3:
 
-    st.title("⚔️ THE REVELATION")
+    st.title("⚡ INTELLIGENCE REPORT")
 
     st.subheader(
-        "The conversation has been forged into intelligence"
+        "Your meeting has been converted into actionable intelligence."
     )
 
-    st.write(
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    st.caption(
+        "STEP 03 / 03"
     )
 
     st.progress(1.0)
-
-    st.caption(
-        "⚔️ JOURNEY COMPLETE — III / III"
-    )
 
     meeting_data = st.session_state.meeting_data
 
     if meeting_data is None:
 
         st.warning(
-            "🕯️ No intelligence has been discovered."
+            "No analysis results are available."
         )
 
         if st.button(
-            "← RETURN TO THE CHAMBER"
+            "← RETURN TO AUDIO"
         ):
 
             st.session_state.page = 2
@@ -677,7 +723,7 @@ elif st.session_state.page == 3:
     )
 
     # ========================================================
-    # SEPARATE TASKS / PROMISES
+    # SEPARATE DATA
     # ========================================================
 
     tasks = []
@@ -696,10 +742,6 @@ elif st.session_state.page == 3:
         elif item_type == "promise":
 
             promises.append(item)
-
-    # ========================================================
-    # DEADLINES
-    # ========================================================
 
     deadlines = []
 
@@ -724,38 +766,46 @@ elif st.session_state.page == 3:
     # ========================================================
 
     st.subheader(
-        "🛡️ THE BATTLEFIELD OVERVIEW"
+        "🔷 INTELLIGENCE OVERVIEW"
     )
 
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
 
-        st.metric(
-            "⚔️ TASKS",
-            len(tasks)
-        )
+        with st.container(border=True):
+
+            st.metric(
+                "⚡ TASKS",
+                len(tasks)
+            )
 
     with col2:
 
-        st.metric(
-            "🤝 OATHS",
-            len(promises)
-        )
+        with st.container(border=True):
+
+            st.metric(
+                "🔗 PROMISES",
+                len(promises)
+            )
 
     with col3:
 
-        st.metric(
-            "⌛ DEADLINES",
-            len(deadlines)
-        )
+        with st.container(border=True):
+
+            st.metric(
+                "◈ DEADLINES",
+                len(deadlines)
+            )
 
     with col4:
 
-        st.metric(
-            "💡 DECISIONS",
-            len(decisions)
-        )
+        with st.container(border=True):
+
+            st.metric(
+                "💡 DECISIONS",
+                len(decisions)
+            )
 
     st.write("")
 
@@ -763,13 +813,13 @@ elif st.session_state.page == 3:
     # SUMMARY
     # ========================================================
 
-    with st.container():
+    with st.container(border=True):
 
         st.subheader(
-            "📜 CHRONICLE OF THE MEETING"
+            "📡 MEETING SIGNAL"
         )
 
-        st.info(summary)
+        st.write(summary)
 
     st.write("")
 
@@ -778,7 +828,7 @@ elif st.session_state.page == 3:
     # ========================================================
 
     st.subheader(
-        "⚔️ QUESTS — TASKS"
+        "⚡ TASK INTELLIGENCE"
     )
 
     if tasks:
@@ -788,10 +838,10 @@ elif st.session_state.page == 3:
             start=1
         ):
 
-            with st.container():
+            with st.container(border=True):
 
                 st.write(
-                    f"### ⚔️ Quest {index}"
+                    f"### ⚡ TASK {index}"
                 )
 
                 col1, col2 = st.columns(2)
@@ -799,7 +849,7 @@ elif st.session_state.page == 3:
                 with col1:
 
                     st.caption(
-                        "👤 CHAMPION"
+                        "👤 ASSIGNED TO"
                     )
 
                     st.write(
@@ -812,7 +862,7 @@ elif st.session_state.page == 3:
                 with col2:
 
                     st.caption(
-                        "⌛ TIMEBOUND"
+                        "◈ DEADLINE"
                     )
 
                     st.write(
@@ -823,7 +873,7 @@ elif st.session_state.page == 3:
                     )
 
                 st.write(
-                    "📜 **Objective**"
+                    "📌 **ACTION**"
                 )
 
                 st.write(
@@ -833,20 +883,22 @@ elif st.session_state.page == 3:
                     )
                 )
 
-                st.divider()
-
     else:
 
-        st.info(
-            "🕯️ No quests were discovered."
-        )
+        with st.container(border=True):
+
+            st.info(
+                "No tasks detected."
+            )
+
+    st.write("")
 
     # ========================================================
     # PROMISES
     # ========================================================
 
     st.subheader(
-        "🤝 OATHS — PROMISES & COMMITMENTS"
+        "🔗 PROMISE & COMMITMENT INTELLIGENCE"
     )
 
     if promises:
@@ -856,10 +908,10 @@ elif st.session_state.page == 3:
             start=1
         ):
 
-            with st.container():
+            with st.container(border=True):
 
                 st.write(
-                    f"### 🤝 Oath {index}"
+                    f"### 🔗 COMMITMENT {index}"
                 )
 
                 col1, col2 = st.columns(2)
@@ -867,7 +919,7 @@ elif st.session_state.page == 3:
                 with col1:
 
                     st.caption(
-                        "👤 SWORN BY"
+                        "👤 PERSON"
                     )
 
                     st.write(
@@ -880,7 +932,7 @@ elif st.session_state.page == 3:
                 with col2:
 
                     st.caption(
-                        "⌛ DEADLINE"
+                        "◈ DEADLINE"
                     )
 
                     st.write(
@@ -891,7 +943,7 @@ elif st.session_state.page == 3:
                     )
 
                 st.write(
-                    "📜 **Oath**"
+                    "📌 **COMMITMENT**"
                 )
 
                 st.write(
@@ -901,20 +953,22 @@ elif st.session_state.page == 3:
                     )
                 )
 
-                st.divider()
-
     else:
 
-        st.info(
-            "🕯️ No oaths were discovered."
-        )
+        with st.container(border=True):
+
+            st.info(
+                "No promises or commitments detected."
+            )
+
+    st.write("")
 
     # ========================================================
     # DEADLINES
     # ========================================================
 
     st.subheader(
-        "⌛ THE HOUR OF FATE — DEADLINES"
+        "◈ DEADLINE MATRIX"
     )
 
     if deadlines:
@@ -924,18 +978,21 @@ elif st.session_state.page == 3:
             start=1
         ):
 
-            with st.container():
+            with st.container(border=True):
 
                 st.write(
-                    f"### ⌛ Deadline {index}"
+                    f"### ◈ DEADLINE {index}"
                 )
 
                 st.write(
-                    f"**{item.get('deadline', 'Not specified')}**"
+                    item.get(
+                        "deadline",
+                        "Not specified"
+                    )
                 )
 
                 st.caption(
-                    "Related action"
+                    "RELATED ACTION"
                 )
 
                 st.write(
@@ -945,20 +1002,22 @@ elif st.session_state.page == 3:
                     )
                 )
 
-                st.divider()
-
     else:
 
-        st.info(
-            "🕯️ No deadlines were discovered."
-        )
+        with st.container(border=True):
+
+            st.info(
+                "No deadlines detected."
+            )
+
+    st.write("")
 
     # ========================================================
     # DECISIONS
     # ========================================================
 
     st.subheader(
-        "💡 THE COUNCIL'S DECISIONS"
+        "💡 DECISION SIGNALS"
     )
 
     if decisions:
@@ -968,175 +1027,179 @@ elif st.session_state.page == 3:
             start=1
         ):
 
-            with st.container():
+            with st.container(border=True):
 
                 st.write(
-                    f"### 💡 Decision {index}"
+                    f"### 💡 DECISION {index}"
                 )
 
                 st.write(decision)
 
-                st.divider()
-
     else:
 
-        st.info(
-            "🕯️ No major decisions were discovered."
-        )
+        with st.container(border=True):
+
+            st.info(
+                "No important decisions detected."
+            )
+
+    st.write("")
 
     # ========================================================
     # DOWNLOAD
     # ========================================================
 
-    st.subheader(
-        "📥 CLAIM THE CHRONICLE"
-    )
+    with st.container(border=True):
 
-    download_text = ""
-
-    download_text += (
-        "THE TARNISHED ARCHIVE\n"
-    )
-
-    download_text += (
-        "AI MEETING TO ACTION INTELLIGENCE\n"
-    )
-
-    download_text += "=" * 55
-    download_text += "\n\n"
-
-    download_text += (
-        "CHRONICLE OF THE MEETING\n"
-    )
-
-    download_text += "-" * 35
-    download_text += "\n"
-
-    download_text += summary
-    download_text += "\n\n"
-
-    # --------------------------------------------------------
-    # TASKS
-    # --------------------------------------------------------
-
-    download_text += (
-        "QUESTS — TASKS\n"
-    )
-
-    download_text += "-" * 35
-    download_text += "\n"
-
-    if tasks:
-
-        for index, task in enumerate(
-            tasks,
-            start=1
-        ):
-
-            download_text += (
-                f"{index}. "
-                f"{task.get('task', 'N/A')}\n"
-            )
-
-            download_text += (
-                f"   Champion: "
-                f"{task.get('speaker', 'Unknown')}\n"
-            )
-
-            download_text += (
-                f"   Deadline: "
-                f"{task.get('deadline', 'Not specified')}\n\n"
-            )
-
-    else:
-
-        download_text += (
-            "No quests discovered.\n\n"
+        st.subheader(
+            "📥 EXPORT INTELLIGENCE"
         )
 
-    # --------------------------------------------------------
-    # PROMISES
-    # --------------------------------------------------------
-
-    download_text += (
-        "OATHS — PROMISES & COMMITMENTS\n"
-    )
-
-    download_text += "-" * 35
-    download_text += "\n"
-
-    if promises:
-
-        for index, promise in enumerate(
-            promises,
-            start=1
-        ):
-
-            download_text += (
-                f"{index}. "
-                f"{promise.get('task', 'N/A')}\n"
-            )
-
-            download_text += (
-                f"   Sworn by: "
-                f"{promise.get('speaker', 'Unknown')}\n"
-            )
-
-            download_text += (
-                f"   Deadline: "
-                f"{promise.get('deadline', 'Not specified')}\n\n"
-            )
-
-    else:
+        download_text = ""
 
         download_text += (
-            "No oaths discovered.\n\n"
+            "NEON MEETING AI\n"
         )
-
-    # --------------------------------------------------------
-    # DECISIONS
-    # --------------------------------------------------------
-
-    download_text += (
-        "THE COUNCIL'S DECISIONS\n"
-    )
-
-    download_text += "-" * 35
-    download_text += "\n"
-
-    if decisions:
-
-        for index, decision in enumerate(
-            decisions,
-            start=1
-        ):
-
-            download_text += (
-                f"{index}. {decision}\n"
-            )
-
-    else:
 
         download_text += (
-            "No decisions discovered.\n"
+            "AI MEETING TO ACTION INTELLIGENCE\n"
         )
 
-    st.download_button(
-        label="📜 DOWNLOAD THE CHRONICLE",
-        data=download_text,
-        file_name="tarnished_meeting_chronicle.txt",
-        mime="text/plain",
-        use_container_width=True
-    )
+        download_text += "=" * 55
+        download_text += "\n\n"
+
+        download_text += (
+            "MEETING SUMMARY\n"
+        )
+
+        download_text += "-" * 35
+        download_text += "\n"
+
+        download_text += summary
+        download_text += "\n\n"
+
+        # ====================================================
+        # TASKS
+        # ====================================================
+
+        download_text += (
+            "TASKS\n"
+        )
+
+        download_text += "-" * 35
+        download_text += "\n"
+
+        if tasks:
+
+            for index, task in enumerate(
+                tasks,
+                start=1
+            ):
+
+                download_text += (
+                    f"{index}. "
+                    f"{task.get('task', 'N/A')}\n"
+                )
+
+                download_text += (
+                    f"   Person: "
+                    f"{task.get('speaker', 'Unknown')}\n"
+                )
+
+                download_text += (
+                    f"   Deadline: "
+                    f"{task.get('deadline', 'Not specified')}\n\n"
+                )
+
+        else:
+
+            download_text += (
+                "No tasks identified.\n\n"
+            )
+
+        # ====================================================
+        # PROMISES
+        # ====================================================
+
+        download_text += (
+            "PROMISES & COMMITMENTS\n"
+        )
+
+        download_text += "-" * 35
+        download_text += "\n"
+
+        if promises:
+
+            for index, promise in enumerate(
+                promises,
+                start=1
+            ):
+
+                download_text += (
+                    f"{index}. "
+                    f"{promise.get('task', 'N/A')}\n"
+                )
+
+                download_text += (
+                    f"   Person: "
+                    f"{promise.get('speaker', 'Unknown')}\n"
+                )
+
+                download_text += (
+                    f"   Deadline: "
+                    f"{promise.get('deadline', 'Not specified')}\n\n"
+                )
+
+        else:
+
+            download_text += (
+                "No promises identified.\n\n"
+            )
+
+        # ====================================================
+        # DECISIONS
+        # ====================================================
+
+        download_text += (
+            "IMPORTANT DECISIONS\n"
+        )
+
+        download_text += "-" * 35
+        download_text += "\n"
+
+        if decisions:
+
+            for index, decision in enumerate(
+                decisions,
+                start=1
+            ):
+
+                download_text += (
+                    f"{index}. {decision}\n"
+                )
+
+        else:
+
+            download_text += (
+                "No important decisions identified.\n"
+            )
+
+        st.download_button(
+            label="⬇️ DOWNLOAD INTELLIGENCE REPORT",
+            data=download_text,
+            file_name="neon_meeting_intelligence.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
 
     st.write("")
 
     # ========================================================
-    # NEW MEETING
+    # NEW ANALYSIS
     # ========================================================
 
     if st.button(
-        "⚔️ BEGIN ANOTHER CHRONICLE",
+        "⚡ ANALYZE ANOTHER MEETING",
         type="primary",
         use_container_width=True
     ):
@@ -1146,3 +1209,4 @@ elif st.session_state.page == 3:
         st.session_state.audio_name = None
 
         st.rerun()
+
