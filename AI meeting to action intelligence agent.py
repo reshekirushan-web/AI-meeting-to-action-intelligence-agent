@@ -32,9 +32,10 @@ if not api_key:
 if not api_key:
     st.error("GEMINI_API_KEY is not configured.")
     st.info(
-        "Add GEMINI_API_KEY to your Streamlit Secrets."
+        "Please add GEMINI_API_KEY to your Streamlit Secrets."
     )
     st.stop()
+
 
 client = genai.Client(api_key=api_key)
 
@@ -66,8 +67,8 @@ if st.session_state.page == 1:
 
     st.write(
         """
-        Transform your meeting recordings into structured,
-        actionable information using AI.
+        Transform meeting recordings into structured,
+        actionable information using Gemini AI.
         """
     )
 
@@ -78,22 +79,28 @@ if st.session_state.page == 1:
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.metric("01", "Tasks")
-        st.write("Identifies tasks assigned during the meeting.")
+        st.metric("01", "TASKS")
+        st.write(
+            "Identifies tasks assigned during the meeting."
+        )
 
     with col2:
-        st.metric("02", "Promises")
-        st.write("Detects commitments and promises.")
+        st.metric("02", "PROMISES")
+        st.write(
+            "Detects promises and commitments."
+        )
 
     with col3:
-        st.metric("03", "Deadlines")
-        st.write("Extracts important deadlines and dates.")
+        st.metric("03", "DEADLINES")
+        st.write(
+            "Extracts deadlines and important dates."
+        )
 
     st.write("---")
 
     st.info(
-        "Upload a meeting recording and let Gemini AI "
-        "extract the important action items."
+        "Upload a meeting recording and let AI convert "
+        "the conversation into actionable information."
     )
 
     if st.button(
@@ -106,14 +113,16 @@ if st.session_state.page == 1:
 
 
 # ============================================================
-# PAGE 2 - AUDIO UPLOAD & ANALYSIS
+# PAGE 2 - AUDIO UPLOAD
 # ============================================================
 
 elif st.session_state.page == 2:
 
     st.title("🎧 LISTEN TO YOUR MEETINGS")
 
-    st.subheader("Upload your audio and let AI do the heavy lifting")
+    st.subheader(
+        "Upload your audio and let AI do the heavy lifting"
+    )
 
     st.write("---")
 
@@ -124,7 +133,7 @@ elif st.session_state.page == 2:
     st.write("")
 
     # --------------------------------------------------------
-    # AUDIO UPLOADER
+    # AUDIO UPLOAD
     # --------------------------------------------------------
 
     audio = st.file_uploader(
@@ -137,14 +146,16 @@ elif st.session_state.page == 2:
 
         st.session_state.audio_name = audio.name
 
-        st.success(f"Audio uploaded: {audio.name}")
+        st.success(
+            f"Audio uploaded successfully: {audio.name}"
+        )
 
         st.audio(audio)
 
-        st.write("")
+        st.write("---")
 
         # ----------------------------------------------------
-        # AUDIO INFORMATION
+        # FILE INFORMATION
         # ----------------------------------------------------
 
         col1, col2 = st.columns(2)
@@ -156,7 +167,9 @@ elif st.session_state.page == 2:
             )
 
         with col2:
-            file_size_mb = len(audio.getbuffer()) / (1024 * 1024)
+            file_size_mb = len(
+                audio.getbuffer()
+            ) / (1024 * 1024)
 
             st.metric(
                 "FILE SIZE",
@@ -183,17 +196,19 @@ elif st.session_state.page == 2:
 
             try:
 
-                # --------------------------------------------
-                # SAVE STREAMLIT UPLOAD TO TEMP FILE
-                # --------------------------------------------
+                # ==================================================
+                # STEP 1 - SAVE AUDIO FILE
+                # ==================================================
 
-                status.info("Preparing your audio...")
+                status.info(
+                    "Preparing your audio..."
+                )
 
-                progress.progress(20)
+                progress.progress(15)
 
                 file_extension = os.path.splitext(
                     audio.name
-                )[1]
+                )[1].lower()
 
                 if not file_extension:
                     file_extension = ".mp3"
@@ -209,49 +224,79 @@ elif st.session_state.page == 2:
 
                     temp_audio_path = temp_audio.name
 
-                # --------------------------------------------
-                # UPLOAD AUDIO TO GEMINI
-                # --------------------------------------------
+                # ==================================================
+                # DETERMINE MIME TYPE
+                # ==================================================
+
+                mime_types = {
+                    ".mp3": "audio/mpeg",
+                    ".wav": "audio/wav",
+                    ".m4a": "audio/mp4"
+                }
+
+                mime_type = mime_types.get(
+                    file_extension,
+                    "audio/mpeg"
+                )
+
+                # ==================================================
+                # STEP 2 - UPLOAD AUDIO TO GEMINI
+                # ==================================================
 
                 status.info(
                     "Uploading meeting audio to Gemini..."
                 )
 
-                progress.progress(40)
+                progress.progress(30)
 
-                audio_file = client.files.upload(
+                uploaded_file = client.files.upload(
                     file=temp_audio_path
                 )
 
-                # --------------------------------------------
-                # GEMINI PROMPT
-                # --------------------------------------------
+                # ==================================================
+                # STEP 3 - ANALYZE AUDIO
+                # ==================================================
 
                 status.info(
-                    "AI is analyzing the meeting..."
+                    "Gemini is listening to your meeting..."
                 )
 
-                progress.progress(60)
+                progress.progress(45)
 
                 prompt = """
 You are an AI Meeting to Action Intelligence Agent.
 
-Analyze the uploaded meeting audio carefully.
+Carefully analyze the uploaded meeting audio.
 
-Extract the following information:
+Your job is to identify actionable information from
+the conversation.
+
+Extract:
 
 1. Tasks assigned to people
-2. Promises or commitments made by people
-3. Deadlines mentioned in the meeting
-4. Important decisions made
-5. A concise summary of the meeting
+2. Promises and commitments made by people
+3. Deadlines mentioned
+4. Important decisions
+5. A concise meeting summary
 
-Return ONLY valid JSON.
+IMPORTANT:
 
-Use exactly this structure:
+- Do NOT invent information.
+- Only include information actually present in the audio.
+- If the speaker is unknown, use "Unknown".
+- If a deadline is not mentioned, use "Not specified".
+- Keep the summary concise.
+- Distinguish tasks from promises.
+- Return ONLY valid JSON.
+- Do not include Markdown.
+- Do not use ```json.
+- Do not include any explanation outside the JSON.
+
+Use exactly this JSON structure:
 
 {
   "summary": "Short summary of the meeting",
+
   "commitments": [
     {
       "speaker": "Speaker 1",
@@ -266,102 +311,162 @@ Use exactly this structure:
       "type": "Promise"
     }
   ],
+
   "decisions": [
     "Decision made during the meeting"
   ]
 }
 
-Rules:
+If there are no tasks or promises, return an empty commitments array.
 
-- Put assigned work under type "Task".
-- Put promises and commitments under type "Promise".
-- If a deadline is not mentioned, use "Not specified".
-- If the speaker is unknown, use "Unknown".
-- Do not invent information.
-- Keep the summary concise.
-- Return ONLY JSON.
+If there are no important decisions, return an empty decisions array.
 """
 
-                # --------------------------------------------
-                # GEMINI ANALYSIS
-                # --------------------------------------------
+                # ==================================================
+                # INTERACTIONS API
+                # ==================================================
 
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=[
-                        audio_file,
-                        prompt
+                interaction = client.interactions.create(
+                    model="gemini-3.6-flash",
+                    input=[
+                        {
+                            "type": "text",
+                            "text": prompt
+                        },
+                        {
+                            "type": "audio",
+                            "uri": uploaded_file.uri,
+                            "mime_type": uploaded_file.mime_type
+                        }
                     ]
                 )
 
-                progress.progress(80)
+                progress.progress(75)
 
-                # --------------------------------------------
-                # CLEAN GEMINI RESPONSE
-                # --------------------------------------------
+                status.info(
+                    "Processing AI results..."
+                )
 
-                result_text = response.text.strip()
+                # ==================================================
+                # GET GEMINI RESPONSE
+                # ==================================================
+
+                result_text = interaction.output_text.strip()
+
+                # ==================================================
+                # CLEAN RESPONSE
+                # ==================================================
 
                 if result_text.startswith("```json"):
+
                     result_text = result_text[
                         7:
                     ].strip()
 
+                elif result_text.startswith("```"):
+
+                    result_text = result_text[
+                        3:
+                    ].strip()
+
                 if result_text.endswith("```"):
+
                     result_text = result_text[
                         :-3
                     ].strip()
+
+                # ==================================================
+                # CONVERT JSON
+                # ==================================================
 
                 meeting_data = json.loads(
                     result_text
                 )
 
-                # --------------------------------------------
+                # ==================================================
+                # VALIDATE DATA
+                # ==================================================
+
+                if "summary" not in meeting_data:
+                    meeting_data["summary"] = (
+                        "No summary available."
+                    )
+
+                if "commitments" not in meeting_data:
+                    meeting_data["commitments"] = []
+
+                if "decisions" not in meeting_data:
+                    meeting_data["decisions"] = []
+
+                # ==================================================
                 # SAVE RESULTS
-                # --------------------------------------------
+                # ==================================================
 
                 st.session_state.meeting_data = meeting_data
 
                 progress.progress(100)
 
                 status.success(
-                    "Meeting analysis completed!"
+                    "Meeting analysis completed successfully!"
                 )
+
+                # ==================================================
+                # GO TO RESULTS PAGE
+                # ==================================================
 
                 st.session_state.page = 3
 
                 st.rerun()
 
+            # ======================================================
+            # JSON ERROR
+            # ======================================================
+
             except json.JSONDecodeError:
 
                 st.error(
-                    "Gemini returned an invalid JSON response."
+                    "Gemini returned a response that was "
+                    "not valid JSON."
                 )
 
-                st.write(
-                    "Raw response:"
-                )
+                st.write("Gemini response:")
 
                 st.code(
                     result_text
                     if "result_text" in locals()
-                    else "No response"
+                    else "No response received."
                 )
+
+            # ======================================================
+            # GENERAL ERROR
+            # ======================================================
 
             except Exception as e:
 
                 st.error(
-                    "Something went wrong while analyzing the meeting."
+                    "An error occurred while analyzing the audio."
+                )
+
+                st.write(
+                    "Please check your Gemini API key, "
+                    "audio file and Gemini API access."
                 )
 
                 st.exception(e)
+
+            # ======================================================
+            # DELETE TEMP FILE
+            # ======================================================
 
             finally:
 
                 if (
                     temp_audio_path
-                    and os.path.exists(temp_audio_path)
+                    and os.path.exists(
+                        temp_audio_path
+                    )
                 ):
+
                     os.remove(
                         temp_audio_path
                     )
@@ -381,6 +486,7 @@ Rules:
     if st.button("← BACK"):
 
         st.session_state.page = 1
+
         st.rerun()
 
 
@@ -390,7 +496,9 @@ Rules:
 
 elif st.session_state.page == 3:
 
-    st.title("📋 GET TASKS, PROMISES & DEADLINES")
+    st.title(
+        "📋 GET TASKS, PROMISES & DEADLINES"
+    )
 
     st.subheader(
         "Your meeting has been converted into actionable information."
@@ -413,12 +521,13 @@ elif st.session_state.page == 3:
         if st.button("← GO BACK"):
 
             st.session_state.page = 2
+
             st.rerun()
 
         st.stop()
 
     # ========================================================
-    # EXTRACT DATA
+    # GET DATA
     # ========================================================
 
     summary = meeting_data.get(
@@ -436,28 +545,49 @@ elif st.session_state.page == 3:
         []
     )
 
-    tasks = [
-        item
-        for item in commitments
-        if item.get("type", "").lower() == "task"
-    ]
+    # ========================================================
+    # SEPARATE TASKS AND PROMISES
+    # ========================================================
 
-    promises = [
-        item
-        for item in commitments
-        if item.get("type", "").lower() == "promise"
-    ]
+    tasks = []
 
-    deadlines = [
-        item
-        for item in commitments
-        if item.get("deadline")
-        and item.get("deadline").lower()
-        != "not specified"
-    ]
+    promises = []
+
+    for item in commitments:
+
+        item_type = str(
+            item.get("type", "")
+        ).lower()
+
+        if item_type == "task":
+
+            tasks.append(item)
+
+        elif item_type == "promise":
+
+            promises.append(item)
 
     # ========================================================
-    # SUMMARY METRICS
+    # DEADLINES
+    # ========================================================
+
+    deadlines = []
+
+    for item in commitments:
+
+        deadline = item.get(
+            "deadline",
+            "Not specified"
+        )
+
+        if deadline:
+
+            if str(deadline).lower() != "not specified":
+
+                deadlines.append(item)
+
+    # ========================================================
+    # OVERVIEW
     # ========================================================
 
     st.subheader("📊 MEETING OVERVIEW")
@@ -465,18 +595,21 @@ elif st.session_state.page == 3:
     col1, col2, col3 = st.columns(3)
 
     with col1:
+
         st.metric(
             "TASKS",
             len(tasks)
         )
 
     with col2:
+
         st.metric(
             "PROMISES",
             len(promises)
         )
 
     with col3:
+
         st.metric(
             "DEADLINES",
             len(deadlines)
@@ -485,7 +618,7 @@ elif st.session_state.page == 3:
     st.write("---")
 
     # ========================================================
-    # MEETING SUMMARY
+    # SUMMARY
     # ========================================================
 
     st.subheader("📝 MEETING SUMMARY")
@@ -564,7 +697,9 @@ elif st.session_state.page == 3:
     # PROMISES
     # ========================================================
 
-    st.subheader("🤝 PROMISES & COMMITMENTS")
+    st.subheader(
+        "🤝 PROMISES & COMMITMENTS"
+    )
 
     if promises:
 
@@ -640,11 +775,13 @@ elif st.session_state.page == 3:
         ):
 
             st.write(
-                f"**{index}. {item.get('deadline', 'Not specified')}**"
+                f"### {index}. "
+                f"{item.get('deadline', 'Not specified')}"
             )
 
             st.write(
-                f"Related action: {item.get('task', 'Not specified')}"
+                f"Related action: "
+                f"{item.get('task', 'Not specified')}"
             )
 
             st.divider()
@@ -656,10 +793,12 @@ elif st.session_state.page == 3:
         )
 
     # ========================================================
-    # IMPORTANT DECISIONS
+    # DECISIONS
     # ========================================================
 
-    st.subheader("💡 IMPORTANT DECISIONS")
+    st.subheader(
+        "💡 IMPORTANT DECISIONS"
+    )
 
     if decisions:
 
@@ -684,17 +823,33 @@ elif st.session_state.page == 3:
     # DOWNLOAD REPORT
     # ========================================================
 
-    st.subheader("📥 DOWNLOAD RESULTS")
+    st.subheader(
+        "📥 DOWNLOAD RESULTS"
+    )
 
-    download_text = "AI MEETING TO ACTION INTELLIGENCE AGENT\n"
+    download_text = ""
+
+    download_text += (
+        "AI MEETING TO ACTION "
+        "INTELLIGENCE AGENT\n"
+    )
+
     download_text += "=" * 50
     download_text += "\n\n"
+
+    # --------------------------------------------------------
+    # SUMMARY
+    # --------------------------------------------------------
 
     download_text += "MEETING SUMMARY\n"
     download_text += "-" * 30
     download_text += "\n"
     download_text += summary
     download_text += "\n\n"
+
+    # --------------------------------------------------------
+    # TASKS
+    # --------------------------------------------------------
 
     download_text += "TASKS\n"
     download_text += "-" * 30
@@ -724,9 +879,18 @@ elif st.session_state.page == 3:
 
     else:
 
-        download_text += "No tasks identified.\n\n"
+        download_text += (
+            "No tasks identified.\n\n"
+        )
 
-    download_text += "PROMISES & COMMITMENTS\n"
+    # --------------------------------------------------------
+    # PROMISES
+    # --------------------------------------------------------
+
+    download_text += (
+        "PROMISES & COMMITMENTS\n"
+    )
+
     download_text += "-" * 30
     download_text += "\n"
 
@@ -758,7 +922,14 @@ elif st.session_state.page == 3:
             "No promises identified.\n\n"
         )
 
-    download_text += "IMPORTANT DECISIONS\n"
+    # --------------------------------------------------------
+    # DECISIONS
+    # --------------------------------------------------------
+
+    download_text += (
+        "IMPORTANT DECISIONS\n"
+    )
+
     download_text += "-" * 30
     download_text += "\n"
 
@@ -778,6 +949,10 @@ elif st.session_state.page == 3:
         download_text += (
             "No important decisions identified.\n"
         )
+
+    # --------------------------------------------------------
+    # DOWNLOAD
+    # --------------------------------------------------------
 
     st.download_button(
         label="⬇️ DOWNLOAD TASKS & PROMISES",
