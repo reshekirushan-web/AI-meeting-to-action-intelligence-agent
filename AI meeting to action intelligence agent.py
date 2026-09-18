@@ -1,7 +1,10 @@
+
 import os
 import json
+import base64
 import tempfile
 from pathlib import Path
+from datetime import datetime
 
 import streamlit as st
 from google import genai
@@ -20,12 +23,21 @@ st.set_page_config(
 
 APP_DIR = Path(__file__).resolve().parent
 
-# Gemini model requested for the new voice-comparison workflow.
-GEMINI_MODEL = "gemini-3.6-flash"
+# Persistent local storage:
+# speaker_profiles/
+#   profiles.json
+#   audio/
+#       <speaker files>
+PROFILE_DIR = APP_DIR / "speaker_profiles"
+AUDIO_DIR = PROFILE_DIR / "audio"
+PROFILE_DB = PROFILE_DIR / "profiles.json"
+
+PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # ============================================================
-# PREMIUM GLASS UI — UNCHANGED
+# PREMIUM GLASS UI — DESIGN PRESERVED
 # ============================================================
 
 st.markdown(
@@ -89,7 +101,6 @@ st.markdown(
         border-radius: 14px;
         min-height: 44px;
     }
-
     </style>
     """,
     unsafe_allow_html=True,
@@ -97,15 +108,17 @@ st.markdown(
 
 
 # ============================================================
-# SECRETS / CLIENT
+# SECRETS
 # ============================================================
 
 def get_secret(name: str):
     value = os.environ.get(name)
     if value:
         return value
+
     try:
-        return st.secrets[name]
+        value = st.secrets[name]
+        return value
     except Exception:
         return None
 
@@ -119,24 +132,17 @@ AUTH_PASSWORD = get_secret("AUTH_PASSWORD") or "admin123"
 # SESSION STATE
 # ============================================================
 
-def initialize_state():
-    defaults = {
-        "authenticated": False,
-        "page": 1,
-        "meeting_data": None,
-        "audio_name": None,
-        "speaker_results": [],
-        "reference_audio_bytes": None,
-        "reference_audio_name": None,
-        "reference_speaker_name": None,
-    }
+defaults = {
+    "authenticated": False,
+    "page": 1,
+    "meeting_data": None,
+    "audio_name": None,
+    "speaker_results": [],
+}
 
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
-
-
-initialize_state()
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 
 # ============================================================
@@ -158,7 +164,9 @@ if not st.session_state.authenticated:
 
     with st.container(border=True):
         st.subheader("🔐 SIGN IN")
-        st.caption("Enter your credentials to access the meeting intelligence system.")
+        st.caption(
+            "Enter your credentials to access the meeting intelligence system."
+        )
 
         username = st.text_input(
             "USERNAME",
@@ -173,48 +181,208 @@ if not st.session_state.authenticated:
             key="login_password",
         )
 
-        if st.button("🔓 LOGIN", type="primary", use_container_width=True):
-            if username == AUTH_USERNAME and password == AUTH_PASSWORD:
+        if st.button(
+            "🔓 LOGIN",
+            type="primary",
+            use_container_width=True,
+        ):
+            if (
+                username == AUTH_USERNAME
+                and password == AUTH_PASSWORD
+            ):
                 st.session_state.authenticated = True
                 st.session_state.page = 1
                 st.rerun()
             else:
                 st.error("❌ Invalid username or password.")
 
-    st.caption("🔒 Secure access • Speaker Recognition • Meeting Intelligence")
+    st.caption(
+        "🔒 Secure access • Speaker Recognition • Meeting Intelligence"
+    )
     st.stop()
+
+
+# ============================================================
+# PERSISTENT SPEAKER DATABASE
+# ============================================================
+
+def load_profiles():
+    """
+    Returns:
+        {
+            "Venkatesh": {
+                "audio_file": "venkatesh_abc123.wav",
+                "original_name": "venkatesh.wav",
+                "mime_type": "audio/wav",
+                "created_at": "2026-09-19T03:00:00"
+            }
+        }
+    """
+    if not PROFILE_DB.exists():
+        return {}
+
+    try:
+        data = json.loads(
+            PROFILE_DB.read_text(encoding="utf-8")
+        )
+
+        if not isinstance(data, dict):
+            return {}
+
+        # Clean invalid entries safely.
+        cleaned = {}
+        for name, profile in data.items():
+            if isinstance(profile, dict):
+                audio_file = profile.get("audio_file")
+                if audio_file:
+                    cleaned[str(name)] = profile
+
+        return cleaned
+
+    except Exception:
+        return {}
+
+
+def save_profiles(profiles):
+    PROFILE_DB.write_text(
+        json.dumps(
+            profiles,
+            indent=2,
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+
+def safe_filename(value: str) -> str:
+    allowed = (
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "0123456789"
+        "-_"
+    )
+
+    cleaned = "".join(
+        c if c in allowed else "_"
+        for c in value
+    )
+
+    return cleaned.strip("_") or "speaker"
+
+
+def delete_profile(name: str):
+    profiles = load_profiles()
+    profile = profiles.pop(name, None)
+
+    if profile:
+        audio_file = profile.get("audio_file")
+
+        if audio_file:
+            audio_path = AUDIO_DIR / Path(audio_file).name
+
+            try:
+                if audio_path.exists():
+                    audio_path.unlink()
+            except OSError:
+                pass
+
+    save_profiles(profiles)
+
+
+def store_reference_audio(
+    speaker_name: str,
+    uploaded_file,
+):
+    """
+    Stores the RAW reference audio locally.
+
+    This is intentionally different from the old version:
+    we do NOT create an embedding and we do NOT need
+    pyannote, SpeechBrain, Torch, or Hugging Face.
+    """
+
+    original_name = Path(uploaded_file.name).name
+    extension = Path(original_name).suffix.lower()
+
+    if not extension:
+        extension = ".wav"
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    clean = safe_filename(speaker_name)
+
+    filename = (
+        f"{clean}_{timestamp}{extension}"
+    )
+
+    destination = AUDIO_DIR / filename
+
+    data = uploaded_file.getvalue()
+
+    if not data:
+        raise RuntimeError(
+            "The uploaded reference audio is empty."
+        )
+
+    destination.write_bytes(data)
+
+    return filename, original_name, data
+
+
+def reference_path(profile):
+    filename = profile.get("audio_file", "")
+    if not filename:
+        return None
+
+    path = AUDIO_DIR / Path(filename).name
+
+    # Prevent accidental path traversal.
+    try:
+        path.resolve().relative_to(
+            AUDIO_DIR.resolve()
+        )
+    except ValueError:
+        return None
+
+    return path
 
 
 # ============================================================
 # AUDIO HELPERS
 # ============================================================
 
-def save_uploaded_audio(uploaded, suffix=None):
-    """Save a Streamlit UploadedFile to a temporary file."""
-    if uploaded is None:
-        raise ValueError("No audio file was supplied.")
+def mime_for_extension(extension: str) -> str:
+    mapping = {
+        ".wav": "audio/wav",
+        ".mp3": "audio/mpeg",
+        ".m4a": "audio/mp4",
+        ".mp4": "audio/mp4",
+        ".webm": "audio/webm",
+        ".ogg": "audio/ogg",
+        ".oga": "audio/ogg",
+        ".flac": "audio/flac",
+    }
 
-    if suffix is None:
-        suffix = Path(uploaded.name).suffix.lower() or ".wav"
+    return mapping.get(
+        extension.lower(),
+        "application/octet-stream",
+    )
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+
+def save_uploaded_audio(uploaded, suffix=".wav"):
+    with tempfile.NamedTemporaryFile(
+        delete=False,
+        suffix=suffix,
+    ) as f:
         f.write(uploaded.getbuffer())
         return f.name
 
 
-def save_bytes_to_temp(audio_bytes, suffix):
-    """Save reference audio bytes to a temporary file."""
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
-        f.write(audio_bytes)
-        return f.name
-
-
-def clean_json_text(text):
-    """Remove Markdown JSON fences if Gemini returns them."""
-    text = (text or "").strip()
+def clean_json_text(text: str) -> str:
+    text = text.strip()
 
     if text.startswith("```json"):
         text = text[7:].strip()
+
     elif text.startswith("```"):
         text = text[3:].strip()
 
@@ -224,16 +392,11 @@ def clean_json_text(text):
     return text
 
 
-def upload_to_gemini(client, path):
-    """Upload an audio file to Gemini and return its uploaded-file object."""
-    return client.files.upload(file=path)
-
-
 # ============================================================
 # SIDEBAR
 # ============================================================
 
-reference_ready = bool(st.session_state.reference_audio_bytes)
+profiles = load_profiles()
 
 with st.sidebar:
     st.markdown("## 💠 NEON MEETING AI")
@@ -241,15 +404,24 @@ with st.sidebar:
 
     st.divider()
 
-    if st.button("🏠 HOME", use_container_width=True):
+    if st.button(
+        "🏠 HOME",
+        use_container_width=True,
+    ):
         st.session_state.page = 1
         st.rerun()
 
-    if st.button("🎙️ VOICE PROFILES", use_container_width=True):
+    if st.button(
+        "🎙️ VOICE PROFILES",
+        use_container_width=True,
+    ):
         st.session_state.page = 2
         st.rerun()
 
-    if st.button("🎧 ANALYZE MEETING", use_container_width=True):
+    if st.button(
+        "🎧 ANALYZE MEETING",
+        use_container_width=True,
+    ):
         st.session_state.page = 3
         st.rerun()
 
@@ -259,17 +431,17 @@ with st.sidebar:
     st.success("Logged in")
 
     st.metric(
-        "Reference Voice",
-        "READY" if reference_ready else "NOT SET",
+        "Registered Speakers",
+        len(profiles),
     )
 
-    if st.button("🚪 LOGOUT", use_container_width=True):
+    if st.button(
+        "🚪 LOGOUT",
+        use_container_width=True,
+    ):
         st.session_state.authenticated = False
         st.session_state.meeting_data = None
         st.session_state.speaker_results = []
-        st.session_state.reference_audio_bytes = None
-        st.session_state.reference_audio_name = None
-        st.session_state.reference_speaker_name = None
         st.session_state.page = 1
         st.rerun()
 
@@ -331,7 +503,7 @@ if st.session_state.page == 1:
 
 
 # ============================================================
-# PAGE 2 — REFERENCE VOICE UPLOAD
+# PAGE 2 — VOICE PROFILES
 # ============================================================
 
 elif st.session_state.page == 2:
@@ -339,9 +511,16 @@ elif st.session_state.page == 2:
     st.title("🎙️ VOICE PROFILE")
 
     st.caption(
-        "Upload a reference voice instead of recording in the browser. "
-        "The audio is kept only for this Streamlit session and used for comparison."
+        "Add one reference audio for each speaker. "
+        "The raw reference audio is stored locally and reused "
+        "for future meeting analysis."
     )
+
+    if not GEMINI_API_KEY:
+        st.warning(
+            "GEMINI_API_KEY is not configured. "
+            "Add it to Streamlit Secrets."
+        )
 
     st.markdown(
         '<div class="glass">',
@@ -351,74 +530,179 @@ elif st.session_state.page == 2:
     name = st.text_input(
         "SPEAKER NAME",
         placeholder="Example: Venkatesh",
-        value=st.session_state.reference_speaker_name or "",
-        key="reference_speaker_name_input",
+        key="reference_speaker_name",
     )
 
-    st.write("### 🎤 Upload reference voice")
-
-    reference_audio = st.file_uploader(
-        "Upload 10–30 seconds of clear speech",
-        type=["wav", "mp3", "m4a", "mp4", "webm", "ogg"],
-        key="reference_audio_uploader",
+    reference_file = st.file_uploader(
+        "UPLOAD REFERENCE VOICE",
+        type=[
+            "wav",
+            "mp3",
+            "m4a",
+            "mp4",
+            "webm",
+            "ogg",
+            "flac",
+        ],
+        accept_multiple_files=False,
+        key="reference_voice_upload",
+        help=(
+            "Upload one clear reference recording for this speaker. "
+            "About 10–30 seconds of natural speech is recommended."
+        ),
     )
 
-    if reference_audio:
-        st.audio(reference_audio)
-        st.caption(
-            f"🎧 Reference audio: {reference_audio.name} • "
-            f"{reference_audio.size / 1024:.1f} KB"
-        )
+    if reference_file:
+        st.audio(reference_file)
 
-        if st.button(
-            "💾 USE REFERENCE VOICE",
-            type="primary",
-            use_container_width=True,
-        ):
+    if reference_file and st.button(
+        "💾 ADD SPEAKER",
+        type="primary",
+        use_container_width=True,
+    ):
+        try:
             clean_name = name.strip()
 
             if len(clean_name) < 2:
-                st.error("❌ Please enter a valid speaker name.")
-            else:
-                st.session_state.reference_audio_bytes = reference_audio.getvalue()
-                st.session_state.reference_audio_name = reference_audio.name
-                st.session_state.reference_speaker_name = clean_name
-                st.session_state.meeting_data = None
-                st.session_state.speaker_results = []
-                st.success(
-                    f"✅ Reference voice loaded for {clean_name}."
+                raise RuntimeError(
+                    "Please enter a valid speaker name."
                 )
+
+            profiles = load_profiles()
+
+            # Case-insensitive duplicate protection.
+            existing = {
+                key.casefold(): key
+                for key in profiles.keys()
+            }
+
+            if clean_name.casefold() in existing:
+                raise RuntimeError(
+                    f"{existing[clean_name.casefold()]} already exists. "
+                    "Delete the old profile before adding it again."
+                )
+
+            (
+                stored_filename,
+                original_name,
+                audio_bytes,
+            ) = store_reference_audio(
+                clean_name,
+                reference_file,
+            )
+
+            profiles[clean_name] = {
+                "audio_file": stored_filename,
+                "original_name": original_name,
+                "mime_type": mime_for_extension(
+                    Path(stored_filename).suffix
+                ),
+                "created_at": datetime.now().isoformat(
+                    timespec="seconds"
+                ),
+                "storage": "local_file",
+            }
+
+            save_profiles(profiles)
+
+            st.success(
+                f"✅ {clean_name} reference voice stored successfully."
+            )
+
+            st.info(
+                f"Stored file: {original_name} "
+                f"({len(audio_bytes) / 1024:.1f} KB)"
+            )
+
+            st.rerun()
+
+        except Exception as exc:
+            st.error(
+                f"❌ Could not store speaker: {exc}"
+            )
 
     st.markdown(
         "</div>",
         unsafe_allow_html=True,
     )
 
-    st.subheader("👥 REFERENCE VOICE")
+    st.subheader("👥 REGISTERED SPEAKERS")
 
-    if st.session_state.reference_audio_bytes:
-        st.success(
-            f"ACTIVE • {st.session_state.reference_speaker_name}"
-        )
-        st.caption(
-            f"Source: {st.session_state.reference_audio_name}"
+    profiles = load_profiles()
+
+    if not profiles:
+        st.info(
+            "No speaker profiles registered yet."
         )
 
-        if st.button("🗑️ CLEAR REFERENCE VOICE", use_container_width=True):
-            st.session_state.reference_audio_bytes = None
-            st.session_state.reference_audio_name = None
-            st.session_state.reference_speaker_name = None
-            st.session_state.meeting_data = None
-            st.session_state.speaker_results = []
-            st.rerun()
     else:
-        st.info("No reference voice uploaded yet.")
+        for speaker_name, profile in profiles.items():
+
+            path = reference_path(profile)
+
+            with st.container(border=True):
+                col1, col2, col3 = st.columns([3, 1, 1])
+
+                with col1:
+                    st.write(
+                        f"### 🎙️ {speaker_name}"
+                    )
+
+                    st.caption(
+                        "Reference: "
+                        + profile.get(
+                            "original_name",
+                            profile.get(
+                                "audio_file",
+                                "Unknown",
+                            ),
+                        )
+                    )
+
+                    st.caption(
+                        "Registered: "
+                        + profile.get(
+                            "created_at",
+                            "Unknown",
+                        )
+                    )
+
+                    if path and path.exists():
+                        try:
+                            st.audio(
+                                path.read_bytes(),
+                                format=profile.get(
+                                    "mime_type",
+                                    "audio/wav",
+                                ),
+                            )
+                        except Exception:
+                            pass
+                    else:
+                        st.error(
+                            "Reference audio file is missing."
+                        )
+
+                with col2:
+                    if path and path.exists():
+                        st.success("ACTIVE")
+                    else:
+                        st.error("MISSING")
+
+                with col3:
+                    if st.button(
+                        "🗑️ DELETE",
+                        key=f"delete_{safe_filename(speaker_name)}",
+                    ):
+                        delete_profile(speaker_name)
+                        st.rerun()
 
     st.divider()
 
     st.warning(
-        "Voice recordings are biometric information. Get the speaker's "
-        "consent before uploading and comparing a voice."
+        "Voice recordings are biometric information. "
+        "Get the speaker's consent before storing and using "
+        "a reference voice."
     )
 
 
@@ -430,13 +714,16 @@ elif st.session_state.page == 3:
 
     st.title("🎧 MEETING ANALYSIS")
 
-    if not st.session_state.reference_audio_bytes:
+    profiles = load_profiles()
+
+    if not profiles:
         st.warning(
-            "No reference voice is available. Upload a reference audio first."
+            "No voice profiles exist yet. "
+            "Register at least one speaker first."
         )
 
         if st.button(
-            "🎙️ GO TO VOICE PROFILE",
+            "🎙️ GO TO VOICE REGISTRATION",
             type="primary",
             use_container_width=True,
         ):
@@ -445,15 +732,57 @@ elif st.session_state.page == 3:
 
         st.stop()
 
+    valid_profiles = {}
+
+    for speaker_name, profile in profiles.items():
+        path = reference_path(profile)
+
+        if path and path.exists():
+            valid_profiles[speaker_name] = profile
+
+    if not valid_profiles:
+        st.error(
+            "All stored speaker reference files are missing. "
+            "Please register the speakers again."
+        )
+        st.stop()
+
     st.caption(
-        f"Reference speaker: {st.session_state.reference_speaker_name} • "
-        "Gemini will compare the reference voice with speakers in the meeting."
+        f"{len(valid_profiles)} registered speaker profile(s) "
+        "available for Gemini voice comparison."
+    )
+
+    st.markdown(
+        '<div class="glass">',
+        unsafe_allow_html=True,
+    )
+
+    st.write("### 👥 REFERENCE SPEAKERS")
+
+    for speaker_name, profile in valid_profiles.items():
+        st.write(
+            f"🎙️ **{speaker_name}** → "
+            f"{profile.get('original_name', profile.get('audio_file', 'audio'))}"
+        )
+
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True,
     )
 
     audio = st.file_uploader(
         "UPLOAD MEETING RECORDING",
-        type=["mp3", "wav", "m4a", "mp4", "webm", "ogg"],
-        key="meeting_audio_uploader",
+        type=[
+            "mp3",
+            "wav",
+            "m4a",
+            "mp4",
+            "webm",
+            "ogg",
+            "flac",
+        ],
+        accept_multiple_files=False,
+        key="meeting_audio_upload",
     )
 
     if audio:
@@ -465,113 +794,206 @@ elif st.session_state.page == 3:
         use_container_width=True,
     ):
 
-        reference_temp = None
-        meeting_temp = None
+        if not GEMINI_API_KEY:
+            st.error(
+                "❌ GEMINI_API_KEY is missing. "
+                "Add it to Streamlit Secrets."
+            )
+            st.stop()
+
+        temp_meeting = None
+        uploaded_gemini_files = []
 
         try:
-            if not GEMINI_API_KEY:
-                raise RuntimeError(
-                    "GEMINI_API_KEY is missing. Add it to Streamlit Secrets."
-                )
-
-            reference_suffix = (
-                Path(st.session_state.reference_audio_name or ".wav")
-                .suffix
-                .lower()
-                or ".wav"
+            extension = (
+                Path(audio.name).suffix.lower()
+                or ".mp3"
             )
-            meeting_suffix = Path(audio.name).suffix.lower() or ".wav"
 
-            reference_temp = save_bytes_to_temp(
-                st.session_state.reference_audio_bytes,
-                reference_suffix,
+            temp_meeting = save_uploaded_audio(
+                audio,
+                extension,
             )
-            meeting_temp = save_uploaded_audio(audio, meeting_suffix)
 
             with st.status(
                 "Running Gemini speaker comparison and meeting intelligence...",
                 expanded=True,
             ) as status:
 
-                st.write("1/4 Preparing reference voice...")
-                st.write("2/4 Uploading reference and meeting audio to Gemini...")
-
-                client = genai.Client(api_key=GEMINI_API_KEY)
-
-                reference_file = upload_to_gemini(
-                    client,
-                    reference_temp,
-                )
-                meeting_file = upload_to_gemini(
-                    client,
-                    meeting_temp,
+                st.write(
+                    "1/4 Preparing registered speaker references..."
                 )
 
-                reference_name = st.session_state.reference_speaker_name
+                client = genai.Client(
+                    api_key=GEMINI_API_KEY
+                )
+
+                # ------------------------------------------------
+                # Upload ONE reference audio per registered speaker.
+                # The text marker immediately before each audio
+                # makes the speaker/audio relationship explicit.
+                # ------------------------------------------------
+
+                gemini_inputs = [
+                    {
+                        "type": "text",
+                        "text": (
+                            "You will receive reference voice recordings "
+                            "followed by one meeting recording."
+                        ),
+                    }
+                ]
+
+                reference_names = []
+
+                for index, (
+                    speaker_name,
+                    profile,
+                ) in enumerate(
+                    valid_profiles.items(),
+                    start=1,
+                ):
+
+                    path = reference_path(profile)
+
+                    if not path or not path.exists():
+                        continue
+
+                    st.write(
+                        f"Uploading reference {index}: "
+                        f"{speaker_name}"
+                    )
+
+                    ref_uploaded = client.files.upload(
+                        file=str(path)
+                    )
+
+                    uploaded_gemini_files.append(
+                        ref_uploaded
+                    )
+
+                    reference_names.append(
+                        speaker_name
+                    )
+
+                    gemini_inputs.append(
+                        {
+                            "type": "text",
+                            "text": (
+                                f"REFERENCE AUDIO {index}: "
+                                f"{speaker_name}"
+                            ),
+                        }
+                    )
+
+                    gemini_inputs.append(
+                        {
+                            "type": "audio",
+                            "uri": ref_uploaded.uri,
+                            "mime_type": (
+                                ref_uploaded.mime_type
+                                or profile.get(
+                                    "mime_type",
+                                    "audio/wav",
+                                )
+                            ),
+                        }
+                    )
+
+                if not reference_names:
+                    raise RuntimeError(
+                        "No valid reference audio files were found."
+                    )
+
+                st.write(
+                    "2/4 Uploading meeting audio..."
+                )
+
+                meeting_uploaded = client.files.upload(
+                    file=temp_meeting
+                )
+
+                uploaded_gemini_files.append(
+                    meeting_uploaded
+                )
+
+                gemini_inputs.extend(
+                    [
+                        {
+                            "type": "text",
+                            "text": "MEETING AUDIO:",
+                        },
+                        {
+                            "type": "audio",
+                            "uri": meeting_uploaded.uri,
+                            "mime_type": (
+                                meeting_uploaded.mime_type
+                                or mime_for_extension(
+                                    extension
+                                )
+                            ),
+                        },
+                    ]
+                )
+
+                reference_list = "\n".join(
+                    f"{i}. {name}"
+                    for i, name in enumerate(
+                        reference_names,
+                        start=1,
+                    )
+                )
 
                 prompt = f"""
-You are an AI Meeting to Action Intelligence Agent using audio understanding.
+You are an AI Meeting to Action Intelligence Agent.
 
-There are TWO audio files:
+You are given:
+1. One reference voice recording for each registered speaker.
+2. One meeting recording containing potentially multiple speakers.
 
-1. REFERENCE VOICE
-   - This is the known speaker: {reference_name}
-   - The reference audio contains that person's voice.
+REGISTERED REFERENCE SPEAKERS:
+{reference_list}
 
-2. MEETING AUDIO
-   - This contains one or more people speaking.
+IMPORTANT VOICE-MATCHING RULES:
+- Each reference audio belongs ONLY to the registered speaker named immediately before it.
+- Compare voices acoustically. Do not identify a person from the words they say, topic, name mentioned in the meeting, or contextual clues alone.
+- A meeting speaker can be matched to a registered speaker only when the voice evidence is reasonably strong.
+- If the evidence is insufficient, use "Unknown".
+- Do not invent identities.
+- One registered person should normally map to at most one distinct meeting speaker.
+- The meeting may contain speakers who are not registered.
+- If multiple registered references are similar, explain the uncertainty rather than inventing a match.
+- Give a confidence value from 0 to 1.
 
-Your job is to compare the reference voice with the voices that occur in the
-meeting audio and identify which meeting speaker, if any, appears to match
-{reference_name}.
+Your tasks:
 
-IMPORTANT VOICE-COMPARISON RULES:
-- Compare actual acoustic voice characteristics, not the words or topic.
-- Do not assume the reference speaker is present.
-- If there is not enough audio evidence, return Unknown.
-- Do not identify a speaker from the speaker's words alone.
-- Treat the comparison as an audio similarity estimate, not definitive
-  biometric authentication.
-- Use a confidence from 0 to 100 only when there is enough evidence.
-- Identify other meeting speakers as Speaker 1, Speaker 2, etc. when possible.
-- If the meeting contains only one clearly identifiable speaker, still compare
-  that speaker against the reference.
+A) Identify distinct speakers in the meeting.
+B) Match each meeting speaker to one of the registered names or Unknown.
+C) Provide a concise reason for each match.
+D) Analyze the meeting for:
+   - concise summary
+   - tasks
+   - promises / commitments
+   - deadlines
+   - important decisions
 
-MEETING INTELLIGENCE:
-Also analyze the meeting audio for:
-1. Concise meeting summary
-2. Tasks
-3. Promises / commitments
-4. Deadlines
-5. Important decisions
+Return ONLY valid JSON.
 
-For every task or promise, identify the speaker label when the audio provides
-reasonable evidence. If the matching speaker is the reference person, use the
-name {reference_name}.
-
-Return ONLY valid JSON in exactly this structure:
+Use exactly this structure:
 
 {{
-  "summary": "Short meeting summary",
   "speaker_results": [
     {{
       "speaker_label": "Speaker 1",
-      "name": "{reference_name}",
-      "score": 86,
-      "confidence": 86,
-      "reason": "Voice characteristics appear similar to the reference audio."
-    }},
-    {{
-      "speaker_label": "Speaker 2",
-      "name": "Unknown",
-      "score": 34,
-      "confidence": 34,
-      "reason": "Insufficient similarity to the reference voice."
+      "name": "Venkatesh",
+      "confidence": 0.91,
+      "reason": "Voice characteristics are consistent with the Venkatesh reference recording."
     }}
   ],
+  "summary": "Short meeting summary",
   "commitments": [
     {{
-      "speaker": "{reference_name}",
+      "speaker": "Venkatesh",
       "task": "Complete the backend",
       "deadline": "Tomorrow",
       "type": "Task"
@@ -583,83 +1005,85 @@ Return ONLY valid JSON in exactly this structure:
 }}
 
 Rules:
-- Do not invent information.
-- If the reference speaker is not confidently identifiable, use Unknown.
-- Keep score/confidence between 0 and 100.
+- Use "Unknown" when a meeting speaker cannot be reliably matched.
 - Use "Not specified" when no deadline is mentioned.
 - Keep the summary concise.
+- Do not invent tasks, deadlines, decisions, or identities.
 - Return valid JSON only.
 """
 
-                st.write("3/4 Comparing voices and analyzing the meeting...")
-
-                interaction = client.interactions.create(
-                    model=GEMINI_MODEL,
-                    input=[
-                        {
-                            "type": "text",
-                            "text": prompt,
-                        },
-                        {
-                            "type": "audio",
-                            "uri": reference_file.uri,
-                            "mime_type": reference_file.mime_type,
-                        },
-                        {
-                            "type": "audio",
-                            "uri": meeting_file.uri,
-                            "mime_type": meeting_file.mime_type,
-                        },
-                    ],
+                gemini_inputs.insert(
+                    1,
+                    {
+                        "type": "text",
+                        "text": prompt,
+                    },
                 )
 
-                result_text = clean_json_text(interaction.output_text)
-                meeting_data = json.loads(result_text)
+                st.write(
+                    "3/4 Comparing meeting speakers "
+                    "with registered reference voices..."
+                )
 
-                meeting_data.setdefault("summary", "No summary available.")
-                meeting_data.setdefault("commitments", [])
-                meeting_data.setdefault("decisions", [])
-                meeting_data.setdefault("speaker_results", [])
+                interaction = client.interactions.create(
+                    model="gemini-3.6-flash",
+                    input=gemini_inputs,
+                )
 
-                # Normalize Gemini output so the existing results UI remains stable.
-                normalized_results = []
-                for index, item in enumerate(meeting_data["speaker_results"], start=1):
-                    if not isinstance(item, dict):
-                        continue
+                result_text = clean_json_text(
+                    interaction.output_text
+                )
 
-                    speaker_label = str(
-                        item.get("speaker_label") or f"Speaker {index}"
-                    )
-                    name_value = str(item.get("name") or "Unknown")
+                meeting_data = json.loads(
+                    result_text
+                )
 
-                    raw_score = item.get(
-                        "score",
-                        item.get("confidence", -1),
-                    )
-                    try:
-                        score = float(raw_score)
-                    except (TypeError, ValueError):
-                        score = -1.0
+                speaker_results = meeting_data.get(
+                    "speaker_results",
+                    [],
+                )
 
-                    if name_value.lower() != reference_name.lower():
-                        name_value = "Unknown"
+                if not isinstance(
+                    speaker_results,
+                    list,
+                ):
+                    speaker_results = []
 
-                    normalized_results.append(
-                        {
-                            "speaker_label": speaker_label,
-                            "name": name_value,
-                            "score": score,
-                            "segments": item.get("segments", 0),
-                            "reason": str(item.get("reason") or ""),
-                        }
-                    )
+                meeting_data.setdefault(
+                    "summary",
+                    "No summary available.",
+                )
 
-                meeting_data["speaker_results"] = normalized_results
-                st.session_state.speaker_results = normalized_results
-                st.session_state.meeting_data = meeting_data
-                st.session_state.audio_name = audio.name
+                meeting_data.setdefault(
+                    "commitments",
+                    [],
+                )
 
-                st.write("4/4 Finalizing intelligence report...")
+                meeting_data.setdefault(
+                    "decisions",
+                    [],
+                )
+
+                meeting_data["speaker_results"] = (
+                    speaker_results
+                )
+
+                st.session_state.speaker_results = (
+                    speaker_results
+                )
+
+                st.session_state.meeting_data = (
+                    meeting_data
+                )
+
+                st.session_state.audio_name = (
+                    audio.name
+                )
+
+                st.write(
+                    "4/4 Finalizing intelligence report..."
+                )
+
                 status.update(
                     label="✅ Meeting analysis complete",
                     state="complete",
@@ -669,19 +1093,21 @@ Rules:
 
         except json.JSONDecodeError:
             st.error(
-                "❌ Gemini returned invalid JSON. Please try the meeting again."
+                "❌ Gemini returned invalid JSON. "
+                "Please try the meeting again."
             )
 
         except Exception as exc:
-            st.error(f"❌ Analysis failed: {exc}")
+            st.error(
+                f"❌ Analysis failed: {exc}"
+            )
 
         finally:
-            for path in [reference_temp, meeting_temp]:
-                if path:
-                    try:
-                        os.remove(path)
-                    except OSError:
-                        pass
+            if temp_meeting:
+                try:
+                    os.remove(temp_meeting)
+                except OSError:
+                    pass
 
 
 # ============================================================
@@ -707,29 +1133,52 @@ if st.session_state.meeting_data:
         len(speaker_results),
     )
 
-    for item in speaker_results:
+    for index, item in enumerate(
+        speaker_results,
+        start=1,
+    ):
 
-        score = item.get("score", -1)
+        label = item.get(
+            "speaker_label",
+            f"Speaker {index}",
+        )
 
-        if score >= 0:
-            score_text = f"{score:.0f}%"
-        else:
-            score_text = "N/A"
+        name = item.get(
+            "name",
+            "Unknown",
+        )
 
-        if item.get("name") == "Unknown":
+        confidence = item.get(
+            "confidence",
+            0,
+        )
+
+        try:
+            confidence = float(confidence)
+        except (TypeError, ValueError):
+            confidence = 0.0
+
+        confidence_text = (
+            f"{confidence:.2f}"
+        )
+
+        if name == "Unknown":
             st.warning(
-                f"🎤 {item.get('speaker_label', 'Speaker')} → **Unknown** "
-                f"(similarity: {score_text})"
+                f"🎤 {label} → **Unknown** "
+                f"(confidence: {confidence_text})"
             )
         else:
             st.success(
-                f"🎤 {item.get('speaker_label', 'Speaker')} → **{item.get('name')}** "
-                f"(similarity: {score_text})"
+                f"🎤 {label} → **{name}** "
+                f"(confidence: {confidence_text})"
             )
 
         reason = item.get("reason")
+
         if reason:
-            st.caption(f"Analysis: {reason}")
+            st.caption(
+                f"Reason: {reason}"
+            )
 
     st.subheader("📝 SUMMARY")
 
@@ -778,7 +1227,9 @@ if st.session_state.meeting_data:
                 )
 
     else:
-        st.info("No tasks or promises detected.")
+        st.info(
+            "No tasks or promises detected."
+        )
 
     st.subheader("💡 DECISIONS")
 
@@ -789,9 +1240,13 @@ if st.session_state.meeting_data:
 
     if decisions:
         for decision in decisions:
-            st.write(f"• {decision}")
+            st.write(
+                f"• {decision}"
+            )
     else:
-        st.info("No important decisions detected.")
+        st.info(
+            "No important decisions detected."
+        )
 
     st.subheader("📥 EXPORT")
 
@@ -800,25 +1255,40 @@ if st.session_state.meeting_data:
         "AI MEETING TO ACTION INTELLIGENCE",
         "=" * 55,
         "",
-        "REFERENCE SPEAKER",
-        "-" * 30,
-        str(st.session_state.reference_speaker_name or "Unknown"),
-        "",
         "SPEAKERS",
         "-" * 30,
     ]
 
     for item in speaker_results:
-        score = item.get("score", -1)
-        if score >= 0:
+
+        label = item.get(
+            "speaker_label",
+            "Unknown",
+        )
+
+        name = item.get(
+            "name",
+            "Unknown",
+        )
+
+        confidence = item.get(
+            "confidence",
+            0,
+        )
+
+        try:
+            confidence = float(confidence)
+        except (TypeError, ValueError):
+            confidence = 0.0
+
+        report.append(
+            f"{label} -> {name} "
+            f"(confidence: {confidence:.2f})"
+        )
+
+        if item.get("reason"):
             report.append(
-                f"{item.get('speaker_label', 'Speaker')} -> "
-                f"{item.get('name', 'Unknown')} "
-                f"(similarity: {score:.0f}%)"
-            )
-        else:
-            report.append(
-                f"{item.get('speaker_label', 'Speaker')} -> Unknown"
+                f"Reason: {item['reason']}"
             )
 
     report.extend(
@@ -826,7 +1296,7 @@ if st.session_state.meeting_data:
             "",
             "SUMMARY",
             "-" * 30,
-            data.get("summary", ""),
+            str(data.get("summary", "")),
             "",
             "TASKS / PROMISES",
             "-" * 30,
@@ -849,7 +1319,9 @@ if st.session_state.meeting_data:
         ]
     )
 
-    report.extend([str(x) for x in decisions])
+    report.extend(
+        [str(x) for x in decisions]
+    )
 
     st.download_button(
         "⬇️ DOWNLOAD INTELLIGENCE REPORT",
