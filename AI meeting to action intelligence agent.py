@@ -126,37 +126,59 @@ st.markdown(
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
+
 if not st.session_state.authenticated:
 
-    st.title("🔐 NEON MEETING AI")
-    st.subheader("Secure Login")
+    st.write("")
+    st.write("")
+    st.write("")
 
-    st.write("Please sign in to access the meeting intelligence system.")
+    st.title("💠 NEON MEETING AI")
+    st.caption("AI MEETING TO ACTION INTELLIGENCE")
+
+    st.write("")
+
+    # ========================================================
+    # PREMIUM GLASS LOGIN PANEL
+    # ========================================================
 
     with st.container(border=True):
 
+        st.subheader("🔐 SIGN IN")
+
+        st.caption(
+            "Enter your credentials to access the "
+            "meeting intelligence system."
+        )
+
+        st.write("")
+
         username = st.text_input(
             "USERNAME",
-            placeholder="Enter your username"
+            placeholder="Enter username",
+            key="login_username"
         )
 
         password = st.text_input(
             "PASSWORD",
             type="password",
-            placeholder="Enter your password"
+            placeholder="Enter password",
+            key="login_password"
         )
 
+        st.write("")
+
         if st.button(
-            "🔓 LOGIN",
+            "🔓  LOGIN",
             type="primary",
             use_container_width=True
         ):
 
-            # For deployment, set AUTH_USERNAME and AUTH_PASSWORD
-            # in Streamlit Secrets or environment variables.
+            # Get credentials from environment variables
             valid_username = os.environ.get("AUTH_USERNAME")
             valid_password = os.environ.get("AUTH_PASSWORD")
 
+            # Fall back to Streamlit Secrets
             if not valid_username:
                 try:
                     valid_username = st.secrets["AUTH_USERNAME"]
@@ -169,6 +191,7 @@ if not st.session_state.authenticated:
                 except Exception:
                     valid_password = "admin123"
 
+            # Authenticate
             if (
                 username == valid_username
                 and password == valid_password
@@ -179,9 +202,11 @@ if not st.session_state.authenticated:
             else:
                 st.error("❌ Invalid username or password.")
 
-    st.info(
-        "Demo login: username `admin` • password `admin123` "
-        "unless you configure AUTH_USERNAME and AUTH_PASSWORD."
+    st.write("")
+    st.write("")
+
+    st.caption(
+        "🔒 Secure access • Meeting Intelligence System"
     )
 
     st.stop()
@@ -1393,4 +1418,3 @@ elif st.session_state.page == 3:
         st.session_state.audio_name = None
 
         st.rerun()
-
