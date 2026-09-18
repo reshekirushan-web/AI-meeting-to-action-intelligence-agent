@@ -19,6 +19,106 @@ st.set_page_config(
 
 
 # ============================================================
+# GREY + GLASS UI THEME
+# ============================================================
+
+st.markdown(
+    """
+    <style>
+    /* Main application background */
+    .stApp {
+        background: #808080;
+        color: #000000;
+    }
+
+    /* Main content text */
+    .stApp p,
+    .stApp label,
+    .stApp span,
+    .stApp div,
+    .stApp li {
+        color: #000000;
+    }
+
+    /* Headings */
+    h1, h2, h3, h4, h5, h6 {
+        color: #000000 !important;
+    }
+
+    /* Glass-style containers */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: rgba(255, 255, 255, 0.28);
+        border: 1px solid rgba(255, 255, 255, 0.55);
+        border-radius: 18px;
+        box-shadow:
+            0 8px 25px rgba(0, 0, 0, 0.12),
+            inset 0 1px 0 rgba(255, 255, 255, 0.45);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 8px;
+    }
+
+    /* Metrics */
+    div[data-testid="stMetric"] {
+        background: rgba(255, 255, 255, 0.24);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        border-radius: 14px;
+        padding: 12px;
+    }
+
+    div[data-testid="stMetricLabel"],
+    div[data-testid="stMetricValue"] {
+        color: #000000 !important;
+    }
+
+    /* Buttons */
+    .stButton > button {
+        border-radius: 12px;
+        border: 1px solid rgba(0, 0, 0, 0.18);
+        color: #000000;
+        background: rgba(255, 255, 255, 0.42);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.12);
+    }
+
+    .stButton > button:hover {
+        background: rgba(255, 255, 255, 0.62);
+        border-color: rgba(0, 0, 0, 0.3);
+    }
+
+    /* Progress bar */
+    div[data-testid="stProgress"] > div > div {
+        background: rgba(255, 255, 255, 0.55);
+    }
+
+    /* File uploader */
+    section[data-testid="stFileUploaderDropzone"] {
+        background: rgba(255, 255, 255, 0.28);
+        border: 1px dashed rgba(0, 0, 0, 0.35);
+        border-radius: 16px;
+    }
+
+    /* Download button */
+    .stDownloadButton > button {
+        border-radius: 12px;
+        color: #000000;
+        background: rgba(255, 255, 255, 0.42);
+        border: 1px solid rgba(0, 0, 0, 0.18);
+    }
+
+    /* Alerts */
+    div[data-testid="stAlert"] {
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.34);
+        color: #000000;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+
+# ============================================================
 # GEMINI API CONFIGURATION
 # ============================================================
 
