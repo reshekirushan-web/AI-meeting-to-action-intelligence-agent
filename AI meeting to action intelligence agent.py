@@ -1,267 +1,277 @@
-
-import streamlit as st
 import os
 import json
 import tempfile
+from pathlib import Path
+
+import streamlit as st
 from google import genai
 
 
 # ============================================================
-# PAGE CONFIGURATION
+# CONFIG
 # ============================================================
 
 st.set_page_config(
     page_title="Neon Meeting AI",
     page_icon="💠",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded",
 )
+
+APP_DIR = Path(__file__).resolve().parent
+
+# Gemini model requested for the new voice-comparison workflow.
+GEMINI_MODEL = "gemini-3.6-flash"
 
 
 # ============================================================
-# GREY + GLASS UI THEME
+# PREMIUM GLASS UI — UNCHANGED
 # ============================================================
 
 st.markdown(
     """
     <style>
-    /* Main application background */
     .stApp {
-        background: #808080;
-        color: #000000;
+        background:
+            radial-gradient(circle at 15% 15%, rgba(70, 80, 120, .32), transparent 30%),
+            radial-gradient(circle at 85% 75%, rgba(20, 130, 150, .22), transparent 30%),
+            #080b12;
+        color: #f5f7fb;
     }
 
-    /* Main content text */
-    .stApp p,
-    .stApp label,
-    .stApp span,
-    .stApp div,
-    .stApp li {
-        color: #000000;
+    [data-testid="stSidebar"] {
+        background: rgba(255,255,255,.045);
+        border-right: 1px solid rgba(255,255,255,.10);
     }
 
-    /* Headings */
-    h1, h2, h3, h4, h5, h6 {
-        color: #000000 !important;
+    .glass {
+        padding: 24px;
+        border-radius: 22px;
+        background: rgba(255,255,255,.065);
+        border: 1px solid rgba(255,255,255,.12);
+        backdrop-filter: blur(18px);
+        margin-bottom: 18px;
     }
 
-    /* Glass-style containers */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        background: rgba(255, 255, 255, 0.28);
-        border: 1px solid rgba(255, 255, 255, 0.55);
+    .hero {
+        padding: 32px;
+        border-radius: 28px;
+        background: linear-gradient(
+            135deg,
+            rgba(255,255,255,.10),
+            rgba(255,255,255,.035)
+        );
+        border: 1px solid rgba(255,255,255,.14);
+        box-shadow: 0 18px 55px rgba(0,0,0,.28);
+        margin-bottom: 24px;
+    }
+
+    .hero-title {
+        font-size: 42px;
+        font-weight: 850;
+        letter-spacing: -1.5px;
+    }
+
+    .hero-subtitle {
+        color: #aeb8ca;
+        font-size: 16px;
+    }
+
+    .profile-card {
+        padding: 18px;
         border-radius: 18px;
-        box-shadow:
-            0 8px 25px rgba(0, 0, 0, 0.12),
-            inset 0 1px 0 rgba(255, 255, 255, 0.45);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        padding: 8px;
+        background: rgba(255,255,255,.055);
+        border: 1px solid rgba(255,255,255,.10);
+        margin-bottom: 12px;
     }
 
-    /* Metrics */
-    div[data-testid="stMetric"] {
-        background: rgba(255, 255, 255, 0.24);
-        border: 1px solid rgba(255, 255, 255, 0.5);
+    div.stButton > button {
         border-radius: 14px;
-        padding: 12px;
+        min-height: 44px;
     }
 
-    div[data-testid="stMetricLabel"],
-    div[data-testid="stMetricValue"] {
-        color: #000000 !important;
-    }
-
-    /* Buttons */
-    .stButton > button {
-        border-radius: 12px;
-        border: 1px solid rgba(0, 0, 0, 0.18);
-        color: #000000;
-        background: rgba(255, 255, 255, 0.42);
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.12);
-    }
-
-    .stButton > button:hover {
-        background: rgba(255, 255, 255, 0.62);
-        border-color: rgba(0, 0, 0, 0.3);
-    }
-
-    /* Progress bar */
-    div[data-testid="stProgress"] > div > div {
-        background: rgba(255, 255, 255, 0.55);
-    }
-
-    /* File uploader */
-    section[data-testid="stFileUploaderDropzone"] {
-        background: rgba(255, 255, 255, 0.28);
-        border: 1px dashed rgba(0, 0, 0, 0.35);
-        border-radius: 16px;
-    }
-
-    /* Download button */
-    .stDownloadButton > button {
-        border-radius: 12px;
-        color: #000000;
-        background: rgba(255, 255, 255, 0.42);
-        border: 1px solid rgba(0, 0, 0, 0.18);
-    }
-
-    /* Alerts */
-    div[data-testid="stAlert"] {
-        border-radius: 14px;
-        background: rgba(255, 255, 255, 0.34);
-        color: #000000;
-    }
     </style>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 
-
-
 # ============================================================
-# LOGIN / AUTHENTICATION
+# SECRETS / CLIENT
 # ============================================================
 
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-
-if not st.session_state.authenticated:
-
-    st.write("")
-    st.write("")
-    st.write("")
-
-    st.title("💠 NEON MEETING AI")
-    st.caption("AI MEETING TO ACTION INTELLIGENCE")
-
-    st.write("")
-
-    # ========================================================
-    # PREMIUM GLASS LOGIN PANEL
-    # ========================================================
-
-    with st.container(border=True):
-
-        st.subheader("🔐 SIGN IN")
-
-        st.caption(
-            "Enter your credentials to access the "
-            "meeting intelligence system."
-        )
-
-        st.write("")
-
-        username = st.text_input(
-            "USERNAME",
-            placeholder="Enter username",
-            key="login_username"
-        )
-
-        password = st.text_input(
-            "PASSWORD",
-            type="password",
-            placeholder="Enter password",
-            key="login_password"
-        )
-
-        st.write("")
-
-        if st.button(
-            "🔓  LOGIN",
-            type="primary",
-            use_container_width=True
-        ):
-
-            # Get credentials from environment variables
-            valid_username = os.environ.get("AUTH_USERNAME")
-            valid_password = os.environ.get("AUTH_PASSWORD")
-
-            # Fall back to Streamlit Secrets
-            if not valid_username:
-                try:
-                    valid_username = st.secrets["AUTH_USERNAME"]
-                except Exception:
-                    valid_username = "admin"
-
-            if not valid_password:
-                try:
-                    valid_password = st.secrets["AUTH_PASSWORD"]
-                except Exception:
-                    valid_password = "admin123"
-
-            # Authenticate
-            if (
-                username == valid_username
-                and password == valid_password
-            ):
-                st.session_state.authenticated = True
-                st.session_state.page = 1
-                st.rerun()
-            else:
-                st.error("❌ Invalid username or password.")
-
-    st.write("")
-    st.write("")
-
-    st.caption(
-        "🔒 Secure access • Meeting Intelligence System"
-    )
-
-    st.stop()
-
-
-# ============================================================
-# LOGOUT
-# ============================================================
-
-with st.sidebar:
-    st.write("### 👤 SESSION")
-    st.success("Logged in")
-
-    if st.button("🚪 LOGOUT", use_container_width=True):
-        st.session_state.authenticated = False
-        st.session_state.meeting_data = None
-        st.session_state.audio_name = None
-        st.session_state.page = 1
-        st.rerun()
-
-# ============================================================
-# GEMINI API CONFIGURATION
-# ============================================================
-
-api_key = os.environ.get("GEMINI_API_KEY")
-
-if not api_key:
+def get_secret(name: str):
+    value = os.environ.get(name)
+    if value:
+        return value
     try:
-        api_key = st.secrets["GEMINI_API_KEY"]
+        return st.secrets[name]
     except Exception:
-        api_key = None
-
-if not api_key:
-    st.error("GEMINI_API_KEY is not configured.")
-    st.info(
-        "Please add GEMINI_API_KEY to your Streamlit Secrets."
-    )
-    st.stop()
+        return None
 
 
-client = genai.Client(api_key=api_key)
+GEMINI_API_KEY = get_secret("GEMINI_API_KEY")
+AUTH_USERNAME = get_secret("AUTH_USERNAME") or "admin"
+AUTH_PASSWORD = get_secret("AUTH_PASSWORD") or "admin123"
 
 
 # ============================================================
 # SESSION STATE
 # ============================================================
 
-if "page" not in st.session_state:
-    st.session_state.page = 1
+def initialize_state():
+    defaults = {
+        "authenticated": False,
+        "page": 1,
+        "meeting_data": None,
+        "audio_name": None,
+        "speaker_results": [],
+        "reference_audio_bytes": None,
+        "reference_audio_name": None,
+        "reference_speaker_name": None,
+    }
 
-if "meeting_data" not in st.session_state:
-    st.session_state.meeting_data = None
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
-if "audio_name" not in st.session_state:
-    st.session_state.audio_name = None
+
+initialize_state()
+
+
+# ============================================================
+# LOGIN
+# ============================================================
+
+if not st.session_state.authenticated:
+    st.write("")
+    st.write("")
+    st.write("")
+
+    st.markdown(
+        '<div class="hero">'
+        '<div class="hero-title">💠 NEON MEETING AI</div>'
+        '<div class="hero-subtitle">AI MEETING TO ACTION INTELLIGENCE</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    with st.container(border=True):
+        st.subheader("🔐 SIGN IN")
+        st.caption("Enter your credentials to access the meeting intelligence system.")
+
+        username = st.text_input(
+            "USERNAME",
+            placeholder="Enter username",
+            key="login_username",
+        )
+
+        password = st.text_input(
+            "PASSWORD",
+            type="password",
+            placeholder="Enter password",
+            key="login_password",
+        )
+
+        if st.button("🔓 LOGIN", type="primary", use_container_width=True):
+            if username == AUTH_USERNAME and password == AUTH_PASSWORD:
+                st.session_state.authenticated = True
+                st.session_state.page = 1
+                st.rerun()
+            else:
+                st.error("❌ Invalid username or password.")
+
+    st.caption("🔒 Secure access • Speaker Recognition • Meeting Intelligence")
+    st.stop()
+
+
+# ============================================================
+# AUDIO HELPERS
+# ============================================================
+
+def save_uploaded_audio(uploaded, suffix=None):
+    """Save a Streamlit UploadedFile to a temporary file."""
+    if uploaded is None:
+        raise ValueError("No audio file was supplied.")
+
+    if suffix is None:
+        suffix = Path(uploaded.name).suffix.lower() or ".wav"
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+        f.write(uploaded.getbuffer())
+        return f.name
+
+
+def save_bytes_to_temp(audio_bytes, suffix):
+    """Save reference audio bytes to a temporary file."""
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+        f.write(audio_bytes)
+        return f.name
+
+
+def clean_json_text(text):
+    """Remove Markdown JSON fences if Gemini returns them."""
+    text = (text or "").strip()
+
+    if text.startswith("```json"):
+        text = text[7:].strip()
+    elif text.startswith("```"):
+        text = text[3:].strip()
+
+    if text.endswith("```"):
+        text = text[:-3].strip()
+
+    return text
+
+
+def upload_to_gemini(client, path):
+    """Upload an audio file to Gemini and return its uploaded-file object."""
+    return client.files.upload(file=path)
+
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+
+reference_ready = bool(st.session_state.reference_audio_bytes)
+
+with st.sidebar:
+    st.markdown("## 💠 NEON MEETING AI")
+    st.caption("AI Meeting to Action Intelligence")
+
+    st.divider()
+
+    if st.button("🏠 HOME", use_container_width=True):
+        st.session_state.page = 1
+        st.rerun()
+
+    if st.button("🎙️ VOICE PROFILES", use_container_width=True):
+        st.session_state.page = 2
+        st.rerun()
+
+    if st.button("🎧 ANALYZE MEETING", use_container_width=True):
+        st.session_state.page = 3
+        st.rerun()
+
+    st.divider()
+
+    st.write("### 👤 SESSION")
+    st.success("Logged in")
+
+    st.metric(
+        "Reference Voice",
+        "READY" if reference_ready else "NOT SET",
+    )
+
+    if st.button("🚪 LOGOUT", use_container_width=True):
+        st.session_state.authenticated = False
+        st.session_state.meeting_data = None
+        st.session_state.speaker_results = []
+        st.session_state.reference_audio_bytes = None
+        st.session_state.reference_audio_name = None
+        st.session_state.reference_speaker_name = None
+        st.session_state.page = 1
+        st.rerun()
 
 
 # ============================================================
@@ -270,1151 +280,581 @@ if "audio_name" not in st.session_state:
 
 if st.session_state.page == 1:
 
-    st.title("💠 NEON MEETING AI")
-
-    st.subheader(
-        "AI MEETING TO ACTION INTELLIGENCE"
+    st.markdown(
+        '<div class="hero">'
+        '<div class="hero-title">💠 NEON MEETING AI</div>'
+        '<div class="hero-subtitle">'
+        'AI MEETING TO ACTION INTELLIGENCE'
+        '</div>'
+        '</div>',
+        unsafe_allow_html=True,
     )
 
-    st.caption(
-        "Turn conversations into structured actions."
+    st.markdown(
+        '<div class="glass">'
+        '<h3>⚡ CONVERSATION → INTELLIGENCE</h3>'
+        '<p>Turn meetings into identified speakers, tasks, promises, deadlines and decisions.</p>'
+        '</div>',
+        unsafe_allow_html=True,
     )
 
-    st.write("")
+    c1, c2, c3, c4 = st.columns(4)
 
-    # ========================================================
-    # HERO PANEL
-    # ========================================================
+    with c1:
+        st.metric("🎙️ SPEAKER ID", "ON")
 
-    with st.container(border=True):
+    with c2:
+        st.metric("🧠 AI ANALYSIS", "ON")
 
-        st.subheader(
-            "⚡ CONVERSATION → INTELLIGENCE"
-        )
+    with c3:
+        st.metric("🔗 COMMITMENTS", "ON")
 
-        st.write(
-            """
-            Transform meeting recordings into actionable
-            intelligence using Gemini AI.
-            """
-        )
-
-        st.info(
-            "Upload a meeting recording and let AI discover "
-            "tasks, promises, deadlines and decisions."
-        )
-
-    st.write("")
-
-    # ========================================================
-    # FEATURES
-    # ========================================================
-
-    st.subheader("🔷 CORE INTELLIGENCE")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-
-        with st.container(border=True):
-
-            st.metric(
-                "⚡ TASKS",
-                "01"
-            )
-
-            st.write(
-                "Identifies tasks assigned during the meeting."
-            )
-
-    with col2:
-
-        with st.container(border=True):
-
-            st.metric(
-                "🔗 PROMISES",
-                "02"
-            )
-
-            st.write(
-                "Detects promises and commitments."
-            )
-
-    with col3:
-
-        with st.container(border=True):
-
-            st.metric(
-                "◈ DEADLINES",
-                "03"
-            )
-
-            st.write(
-                "Extracts deadlines and important dates."
-            )
-
-    st.write("")
-
-    # ========================================================
-    # HOW IT WORKS
-    # ========================================================
-
-    st.subheader("🚀 INTELLIGENCE PIPELINE")
-
-    step1, step2, step3 = st.columns(3)
-
-    with step1:
-
-        with st.container(border=True):
-
-            st.write("### 01")
-            st.write("🎙️ **UPLOAD**")
-
-            st.caption(
-                "Provide your meeting recording."
-            )
-
-    with step2:
-
-        with st.container(border=True):
-
-            st.write("### 02")
-            st.write("🧠 **ANALYZE**")
-
-            st.caption(
-                "Gemini processes the conversation."
-            )
-
-    with step3:
-
-        with st.container(border=True):
-
-            st.write("### 03")
-            st.write("⚡ **ACT**")
-
-            st.caption(
-                "Receive structured actionable intelligence."
-            )
-
-    st.write("")
-
-    # ========================================================
-    # START
-    # ========================================================
-
-    with st.container(border=True):
-
-        st.subheader(
-            "🔮 READY TO ANALYZE?"
-        )
-
-        st.write(
-            "Begin your meeting intelligence session."
-        )
-
-        if st.button(
-            "⚡ START ANALYSIS →",
-            type="primary",
-            use_container_width=True
-        ):
-
-            st.session_state.page = 2
-            st.rerun()
-
-
-# ============================================================
-# PAGE 2 — UPLOAD
-# ============================================================
-
-elif st.session_state.page == 2:
-
-    st.title("🎙️ AUDIO INTELLIGENCE")
-
-    st.subheader(
-        "Upload your meeting recording"
-    )
-
-    st.caption(
-        "STEP 02 / 03"
-    )
-
-    st.progress(0.66)
-
-    st.write("")
-
-    # ========================================================
-    # UPLOAD PANEL
-    # ========================================================
-
-    with st.container(border=True):
-
-        st.subheader(
-            "💠 RECORDING INPUT"
-        )
-
-        st.write(
-            "Choose an MP3, WAV or M4A meeting recording."
-        )
-
-        audio = st.file_uploader(
-            "UPLOAD AUDIO",
-            type=["mp3", "wav", "m4a"],
-            help="Supported formats: MP3, WAV and M4A."
-        )
-
-    # ========================================================
-    # AUDIO EXISTS
-    # ========================================================
-
-    if audio is not None:
-
-        st.session_state.audio_name = audio.name
-
-        st.write("")
-
-        # ====================================================
-        # FILE ACCEPTED
-        # ====================================================
-
-        with st.container(border=True):
-
-            st.success(
-                f"✓ AUDIO READY — {audio.name}"
-            )
-
-            st.audio(audio)
-
-        st.write("")
-
-        # ====================================================
-        # FILE INFORMATION
-        # ====================================================
-
-        st.subheader(
-            "📊 RECORDING DATA"
-        )
-
-        file_size_mb = (
-            len(audio.getbuffer())
-            / (1024 * 1024)
-        )
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-
-            with st.container(border=True):
-
-                st.metric(
-                    "📁 FILE",
-                    audio.name
-                )
-
-        with col2:
-
-            with st.container(border=True):
-
-                st.metric(
-                    "💾 SIZE",
-                    f"{file_size_mb:.2f} MB"
-                )
-
-        with col3:
-
-            with st.container(border=True):
-
-                st.metric(
-                    "🎧 FORMAT",
-                    audio.name.split(".")[-1].upper()
-                )
-
-        st.write("")
-
-        # ====================================================
-        # ANALYSIS TARGETS
-        # ====================================================
-
-        with st.container(border=True):
-
-            st.subheader(
-                "🧠 AI ANALYSIS TARGETS"
-            )
-
-            target1, target2 = st.columns(2)
-
-            with target1:
-
-                st.write(
-                    "⚡ **TASKS**"
-                )
-
-                st.caption(
-                    "Assigned actions and responsibilities."
-                )
-
-                st.write(
-                    "🔗 **PROMISES**"
-                )
-
-                st.caption(
-                    "Commitments made by participants."
-                )
-
-            with target2:
-
-                st.write(
-                    "◈ **DEADLINES**"
-                )
-
-                st.caption(
-                    "Important dates and time limits."
-                )
-
-                st.write(
-                    "💡 **DECISIONS**"
-                )
-
-                st.caption(
-                    "Important decisions made during the meeting."
-                )
-
-        st.write("")
-
-        # ====================================================
-        # ANALYZE
-        # ====================================================
-
-        if st.button(
-            "🧠 ANALYZE MEETING",
-            type="primary",
-            use_container_width=True
-        ):
-
-            progress = st.progress(0)
-
-            status = st.empty()
-
-            temp_audio_path = None
-
-            try:
-
-                # ==================================================
-                # SAVE AUDIO
-                # ==================================================
-
-                status.info(
-                    "⚡ Preparing audio..."
-                )
-
-                progress.progress(15)
-
-                file_extension = os.path.splitext(
-                    audio.name
-                )[1].lower()
-
-                if not file_extension:
-                    file_extension = ".mp3"
-
-                with tempfile.NamedTemporaryFile(
-                    delete=False,
-                    suffix=file_extension
-                ) as temp_audio:
-
-                    temp_audio.write(
-                        audio.getbuffer()
-                    )
-
-                    temp_audio_path = temp_audio.name
-
-                # ==================================================
-                # MIME TYPE
-                # ==================================================
-
-                mime_types = {
-                    ".mp3": "audio/mpeg",
-                    ".wav": "audio/wav",
-                    ".m4a": "audio/mp4"
-                }
-
-                mime_type = mime_types.get(
-                    file_extension,
-                    "audio/mpeg"
-                )
-
-                # ==================================================
-                # UPLOAD TO GEMINI
-                # ==================================================
-
-                status.info(
-                    "📡 Sending audio to Gemini..."
-                )
-
-                progress.progress(30)
-
-                uploaded_file = client.files.upload(
-                    file=temp_audio_path
-                )
-
-                # ==================================================
-                # AI ANALYSIS
-                # ==================================================
-
-                status.info(
-                    "🧠 AI is analyzing the conversation..."
-                )
-
-                progress.progress(45)
-
-                prompt = """
-You are an AI Meeting to Action Intelligence Agent.
-
-Carefully analyze the uploaded meeting audio.
-
-Your job is to identify actionable information from
-the conversation.
-
-Extract:
-
-1. Tasks assigned to people
-2. Promises and commitments made by people
-3. Deadlines mentioned
-4. Important decisions
-5. A concise meeting summary
-
-IMPORTANT:
-
-- Do NOT invent information.
-- Only include information actually present in the audio.
-- If the speaker is unknown, use "Unknown".
-- If a deadline is not mentioned, use "Not specified".
-- Keep the summary concise.
-- Distinguish tasks from promises.
-- Return ONLY valid JSON.
-- Do not include Markdown.
-- Do not use ```json.
-- Do not include any explanation outside the JSON.
-
-Use exactly this JSON structure:
-
-{
-  "summary": "Short summary of the meeting",
-
-  "commitments": [
-    {
-      "speaker": "Speaker 1",
-      "task": "Complete the database module",
-      "deadline": "Friday",
-      "type": "Task"
-    },
-    {
-      "speaker": "Speaker 2",
-      "task": "Send the presentation",
-      "deadline": "Tomorrow",
-      "type": "Promise"
-    }
-  ],
-
-  "decisions": [
-    "Decision made during the meeting"
-  ]
-}
-
-If there are no tasks or promises, return an empty commitments array.
-
-If there are no important decisions, return an empty decisions array.
-"""
-
-                # ==================================================
-                # GEMINI INTERACTION
-                # ==================================================
-
-                interaction = client.interactions.create(
-                    model="gemini-3.6-flash",
-                    input=[
-                        {
-                            "type": "text",
-                            "text": prompt
-                        },
-                        {
-                            "type": "audio",
-                            "uri": uploaded_file.uri,
-                            "mime_type": uploaded_file.mime_type
-                        }
-                    ]
-                )
-
-                progress.progress(75)
-
-                status.info(
-                    "⚡ Forging the intelligence report..."
-                )
-
-                # ==================================================
-                # RESPONSE
-                # ==================================================
-
-                result_text = (
-                    interaction.output_text.strip()
-                )
-
-                # ==================================================
-                # CLEAN JSON
-                # ==================================================
-
-                if result_text.startswith("```json"):
-
-                    result_text = result_text[
-                        7:
-                    ].strip()
-
-                elif result_text.startswith("```"):
-
-                    result_text = result_text[
-                        3:
-                    ].strip()
-
-                if result_text.endswith("```"):
-
-                    result_text = result_text[
-                        :-3
-                    ].strip()
-
-                # ==================================================
-                # PARSE
-                # ==================================================
-
-                meeting_data = json.loads(
-                    result_text
-                )
-
-                if "summary" not in meeting_data:
-
-                    meeting_data["summary"] = (
-                        "No summary available."
-                    )
-
-                if "commitments" not in meeting_data:
-
-                    meeting_data["commitments"] = []
-
-                if "decisions" not in meeting_data:
-
-                    meeting_data["decisions"] = []
-
-                # ==================================================
-                # SAVE
-                # ==================================================
-
-                st.session_state.meeting_data = (
-                    meeting_data
-                )
-
-                progress.progress(100)
-
-                status.success(
-                    "✓ ANALYSIS COMPLETE"
-                )
-
-                st.session_state.page = 3
-
-                st.rerun()
-
-            except json.JSONDecodeError:
-
-                st.error(
-                    "⚠️ AI returned invalid JSON."
-                )
-
-                st.code(
-                    result_text
-                    if "result_text" in locals()
-                    else "No response received."
-                )
-
-            except Exception as e:
-
-                st.error(
-                    "⚠️ Analysis failed."
-                )
-
-                st.info(
-                    "Check your Gemini API key, "
-                    "audio file and API access."
-                )
-
-                st.exception(e)
-
-            finally:
-
-                if (
-                    temp_audio_path
-                    and os.path.exists(
-                        temp_audio_path
-                    )
-                ):
-
-                    os.remove(
-                        temp_audio_path
-                    )
-
-    else:
-
-        st.write("")
-
-        with st.container(border=True):
-
-            st.info(
-                "🎙️ Upload a meeting recording to begin."
-            )
+    with c4:
+        st.metric("◈ DEADLINES", "ON")
 
     st.write("")
 
     if st.button(
-        "← BACK TO HOME"
+        "🎙️ REGISTER VOICE",
+        type="primary",
+        use_container_width=True,
     ):
+        st.session_state.page = 2
+        st.rerun()
 
-        st.session_state.page = 1
+    if st.button(
+        "🎧 ANALYZE A MEETING",
+        use_container_width=True,
+    ):
+        st.session_state.page = 3
         st.rerun()
 
 
 # ============================================================
-# PAGE 3 — RESULTS
+# PAGE 2 — REFERENCE VOICE UPLOAD
+# ============================================================
+
+elif st.session_state.page == 2:
+
+    st.title("🎙️ VOICE PROFILE")
+
+    st.caption(
+        "Upload a reference voice instead of recording in the browser. "
+        "The audio is kept only for this Streamlit session and used for comparison."
+    )
+
+    st.markdown(
+        '<div class="glass">',
+        unsafe_allow_html=True,
+    )
+
+    name = st.text_input(
+        "SPEAKER NAME",
+        placeholder="Example: Venkatesh",
+        value=st.session_state.reference_speaker_name or "",
+        key="reference_speaker_name_input",
+    )
+
+    st.write("### 🎤 Upload reference voice")
+
+    reference_audio = st.file_uploader(
+        "Upload 10–30 seconds of clear speech",
+        type=["wav", "mp3", "m4a", "mp4", "webm", "ogg"],
+        key="reference_audio_uploader",
+    )
+
+    if reference_audio:
+        st.audio(reference_audio)
+        st.caption(
+            f"🎧 Reference audio: {reference_audio.name} • "
+            f"{reference_audio.size / 1024:.1f} KB"
+        )
+
+        if st.button(
+            "💾 USE REFERENCE VOICE",
+            type="primary",
+            use_container_width=True,
+        ):
+            clean_name = name.strip()
+
+            if len(clean_name) < 2:
+                st.error("❌ Please enter a valid speaker name.")
+            else:
+                st.session_state.reference_audio_bytes = reference_audio.getvalue()
+                st.session_state.reference_audio_name = reference_audio.name
+                st.session_state.reference_speaker_name = clean_name
+                st.session_state.meeting_data = None
+                st.session_state.speaker_results = []
+                st.success(
+                    f"✅ Reference voice loaded for {clean_name}."
+                )
+
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.subheader("👥 REFERENCE VOICE")
+
+    if st.session_state.reference_audio_bytes:
+        st.success(
+            f"ACTIVE • {st.session_state.reference_speaker_name}"
+        )
+        st.caption(
+            f"Source: {st.session_state.reference_audio_name}"
+        )
+
+        if st.button("🗑️ CLEAR REFERENCE VOICE", use_container_width=True):
+            st.session_state.reference_audio_bytes = None
+            st.session_state.reference_audio_name = None
+            st.session_state.reference_speaker_name = None
+            st.session_state.meeting_data = None
+            st.session_state.speaker_results = []
+            st.rerun()
+    else:
+        st.info("No reference voice uploaded yet.")
+
+    st.divider()
+
+    st.warning(
+        "Voice recordings are biometric information. Get the speaker's "
+        "consent before uploading and comparing a voice."
+    )
+
+
+# ============================================================
+# PAGE 3 — MEETING ANALYSIS
 # ============================================================
 
 elif st.session_state.page == 3:
 
-    st.title("⚡ INTELLIGENCE REPORT")
+    st.title("🎧 MEETING ANALYSIS")
 
-    st.subheader(
-        "Your meeting has been converted into actionable intelligence."
-    )
-
-    st.caption(
-        "STEP 03 / 03"
-    )
-
-    st.progress(1.0)
-
-    meeting_data = st.session_state.meeting_data
-
-    if meeting_data is None:
-
+    if not st.session_state.reference_audio_bytes:
         st.warning(
-            "No analysis results are available."
+            "No reference voice is available. Upload a reference audio first."
         )
 
         if st.button(
-            "← RETURN TO AUDIO"
+            "🎙️ GO TO VOICE PROFILE",
+            type="primary",
+            use_container_width=True,
         ):
-
             st.session_state.page = 2
             st.rerun()
 
         st.stop()
 
-    # ========================================================
-    # DATA
-    # ========================================================
-
-    summary = meeting_data.get(
-        "summary",
-        "No summary available."
+    st.caption(
+        f"Reference speaker: {st.session_state.reference_speaker_name} • "
+        "Gemini will compare the reference voice with speakers in the meeting."
     )
 
-    commitments = meeting_data.get(
-        "commitments",
-        []
+    audio = st.file_uploader(
+        "UPLOAD MEETING RECORDING",
+        type=["mp3", "wav", "m4a", "mp4", "webm", "ogg"],
+        key="meeting_audio_uploader",
     )
 
-    decisions = meeting_data.get(
-        "decisions",
-        []
+    if audio:
+        st.audio(audio)
+
+    if audio and st.button(
+        "🧠 ANALYZE MEETING",
+        type="primary",
+        use_container_width=True,
+    ):
+
+        reference_temp = None
+        meeting_temp = None
+
+        try:
+            if not GEMINI_API_KEY:
+                raise RuntimeError(
+                    "GEMINI_API_KEY is missing. Add it to Streamlit Secrets."
+                )
+
+            reference_suffix = (
+                Path(st.session_state.reference_audio_name or ".wav")
+                .suffix
+                .lower()
+                or ".wav"
+            )
+            meeting_suffix = Path(audio.name).suffix.lower() or ".wav"
+
+            reference_temp = save_bytes_to_temp(
+                st.session_state.reference_audio_bytes,
+                reference_suffix,
+            )
+            meeting_temp = save_uploaded_audio(audio, meeting_suffix)
+
+            with st.status(
+                "Running Gemini speaker comparison and meeting intelligence...",
+                expanded=True,
+            ) as status:
+
+                st.write("1/4 Preparing reference voice...")
+                st.write("2/4 Uploading reference and meeting audio to Gemini...")
+
+                client = genai.Client(api_key=GEMINI_API_KEY)
+
+                reference_file = upload_to_gemini(
+                    client,
+                    reference_temp,
+                )
+                meeting_file = upload_to_gemini(
+                    client,
+                    meeting_temp,
+                )
+
+                reference_name = st.session_state.reference_speaker_name
+
+                prompt = f"""
+You are an AI Meeting to Action Intelligence Agent using audio understanding.
+
+There are TWO audio files:
+
+1. REFERENCE VOICE
+   - This is the known speaker: {reference_name}
+   - The reference audio contains that person's voice.
+
+2. MEETING AUDIO
+   - This contains one or more people speaking.
+
+Your job is to compare the reference voice with the voices that occur in the
+meeting audio and identify which meeting speaker, if any, appears to match
+{reference_name}.
+
+IMPORTANT VOICE-COMPARISON RULES:
+- Compare actual acoustic voice characteristics, not the words or topic.
+- Do not assume the reference speaker is present.
+- If there is not enough audio evidence, return Unknown.
+- Do not identify a speaker from the speaker's words alone.
+- Treat the comparison as an audio similarity estimate, not definitive
+  biometric authentication.
+- Use a confidence from 0 to 100 only when there is enough evidence.
+- Identify other meeting speakers as Speaker 1, Speaker 2, etc. when possible.
+- If the meeting contains only one clearly identifiable speaker, still compare
+  that speaker against the reference.
+
+MEETING INTELLIGENCE:
+Also analyze the meeting audio for:
+1. Concise meeting summary
+2. Tasks
+3. Promises / commitments
+4. Deadlines
+5. Important decisions
+
+For every task or promise, identify the speaker label when the audio provides
+reasonable evidence. If the matching speaker is the reference person, use the
+name {reference_name}.
+
+Return ONLY valid JSON in exactly this structure:
+
+{{
+  "summary": "Short meeting summary",
+  "speaker_results": [
+    {{
+      "speaker_label": "Speaker 1",
+      "name": "{reference_name}",
+      "score": 86,
+      "confidence": 86,
+      "reason": "Voice characteristics appear similar to the reference audio."
+    }},
+    {{
+      "speaker_label": "Speaker 2",
+      "name": "Unknown",
+      "score": 34,
+      "confidence": 34,
+      "reason": "Insufficient similarity to the reference voice."
+    }}
+  ],
+  "commitments": [
+    {{
+      "speaker": "{reference_name}",
+      "task": "Complete the backend",
+      "deadline": "Tomorrow",
+      "type": "Task"
+    }}
+  ],
+  "decisions": [
+    "Decision made"
+  ]
+}}
+
+Rules:
+- Do not invent information.
+- If the reference speaker is not confidently identifiable, use Unknown.
+- Keep score/confidence between 0 and 100.
+- Use "Not specified" when no deadline is mentioned.
+- Keep the summary concise.
+- Return valid JSON only.
+"""
+
+                st.write("3/4 Comparing voices and analyzing the meeting...")
+
+                interaction = client.interactions.create(
+                    model=GEMINI_MODEL,
+                    input=[
+                        {
+                            "type": "text",
+                            "text": prompt,
+                        },
+                        {
+                            "type": "audio",
+                            "uri": reference_file.uri,
+                            "mime_type": reference_file.mime_type,
+                        },
+                        {
+                            "type": "audio",
+                            "uri": meeting_file.uri,
+                            "mime_type": meeting_file.mime_type,
+                        },
+                    ],
+                )
+
+                result_text = clean_json_text(interaction.output_text)
+                meeting_data = json.loads(result_text)
+
+                meeting_data.setdefault("summary", "No summary available.")
+                meeting_data.setdefault("commitments", [])
+                meeting_data.setdefault("decisions", [])
+                meeting_data.setdefault("speaker_results", [])
+
+                # Normalize Gemini output so the existing results UI remains stable.
+                normalized_results = []
+                for index, item in enumerate(meeting_data["speaker_results"], start=1):
+                    if not isinstance(item, dict):
+                        continue
+
+                    speaker_label = str(
+                        item.get("speaker_label") or f"Speaker {index}"
+                    )
+                    name_value = str(item.get("name") or "Unknown")
+
+                    raw_score = item.get(
+                        "score",
+                        item.get("confidence", -1),
+                    )
+                    try:
+                        score = float(raw_score)
+                    except (TypeError, ValueError):
+                        score = -1.0
+
+                    if name_value.lower() != reference_name.lower():
+                        name_value = "Unknown"
+
+                    normalized_results.append(
+                        {
+                            "speaker_label": speaker_label,
+                            "name": name_value,
+                            "score": score,
+                            "segments": item.get("segments", 0),
+                            "reason": str(item.get("reason") or ""),
+                        }
+                    )
+
+                meeting_data["speaker_results"] = normalized_results
+                st.session_state.speaker_results = normalized_results
+                st.session_state.meeting_data = meeting_data
+                st.session_state.audio_name = audio.name
+
+                st.write("4/4 Finalizing intelligence report...")
+                status.update(
+                    label="✅ Meeting analysis complete",
+                    state="complete",
+                )
+
+            st.rerun()
+
+        except json.JSONDecodeError:
+            st.error(
+                "❌ Gemini returned invalid JSON. Please try the meeting again."
+            )
+
+        except Exception as exc:
+            st.error(f"❌ Analysis failed: {exc}")
+
+        finally:
+            for path in [reference_temp, meeting_temp]:
+                if path:
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
+
+
+# ============================================================
+# RESULTS
+# ============================================================
+
+if st.session_state.meeting_data:
+
+    data = st.session_state.meeting_data
+
+    st.divider()
+    st.title("📊 MEETING INTELLIGENCE")
+
+    speaker_results = data.get(
+        "speaker_results",
+        st.session_state.speaker_results,
     )
 
-    # ========================================================
-    # SEPARATE DATA
-    # ========================================================
+    st.subheader("🎙️ SPEAKER RECOGNITION")
 
-    tasks = []
-    promises = []
-
-    for item in commitments:
-
-        item_type = str(
-            item.get("type", "")
-        ).lower()
-
-        if item_type == "task":
-
-            tasks.append(item)
-
-        elif item_type == "promise":
-
-            promises.append(item)
-
-    deadlines = []
-
-    for item in commitments:
-
-        deadline = item.get(
-            "deadline",
-            "Not specified"
-        )
-
-        if deadline:
-
-            if (
-                str(deadline).lower()
-                != "not specified"
-            ):
-
-                deadlines.append(item)
-
-    # ========================================================
-    # OVERVIEW
-    # ========================================================
-
-    st.subheader(
-        "🔷 INTELLIGENCE OVERVIEW"
+    st.metric(
+        "TOTAL SPEAKERS",
+        len(speaker_results),
     )
 
-    col1, col2, col3, col4 = st.columns(4)
+    for item in speaker_results:
 
-    with col1:
+        score = item.get("score", -1)
 
-        with st.container(border=True):
+        if score >= 0:
+            score_text = f"{score:.0f}%"
+        else:
+            score_text = "N/A"
 
-            st.metric(
-                "⚡ TASKS",
-                len(tasks)
+        if item.get("name") == "Unknown":
+            st.warning(
+                f"🎤 {item.get('speaker_label', 'Speaker')} → **Unknown** "
+                f"(similarity: {score_text})"
+            )
+        else:
+            st.success(
+                f"🎤 {item.get('speaker_label', 'Speaker')} → **{item.get('name')}** "
+                f"(similarity: {score_text})"
             )
 
-    with col2:
+        reason = item.get("reason")
+        if reason:
+            st.caption(f"Analysis: {reason}")
 
-        with st.container(border=True):
-
-            st.metric(
-                "🔗 PROMISES",
-                len(promises)
-            )
-
-    with col3:
-
-        with st.container(border=True):
-
-            st.metric(
-                "◈ DEADLINES",
-                len(deadlines)
-            )
-
-    with col4:
-
-        with st.container(border=True):
-
-            st.metric(
-                "💡 DECISIONS",
-                len(decisions)
-            )
-
-    st.write("")
-
-    # ========================================================
-    # SUMMARY
-    # ========================================================
+    st.subheader("📝 SUMMARY")
 
     with st.container(border=True):
-
-        st.subheader(
-            "📡 MEETING SIGNAL"
+        st.write(
+            data.get(
+                "summary",
+                "No summary available.",
+            )
         )
 
-        st.write(summary)
-
-    st.write("")
-
-    # ========================================================
-    # TASKS
-    # ========================================================
-
-    st.subheader(
-        "⚡ TASK INTELLIGENCE"
+    commitments = data.get(
+        "commitments",
+        [],
     )
 
-    if tasks:
+    st.subheader("✅ TASKS & PROMISES")
 
-        for index, task in enumerate(
-            tasks,
-            start=1
-        ):
-
-            with st.container(border=True):
-
-                st.write(
-                    f"### ⚡ TASK {index}"
-                )
-
-                col1, col2 = st.columns(2)
-
-                with col1:
-
-                    st.caption(
-                        "👤 ASSIGNED TO"
-                    )
-
-                    st.write(
-                        task.get(
-                            "speaker",
-                            "Unknown"
-                        )
-                    )
-
-                with col2:
-
-                    st.caption(
-                        "◈ DEADLINE"
-                    )
-
-                    st.write(
-                        task.get(
-                            "deadline",
-                            "Not specified"
-                        )
-                    )
-
-                st.write(
-                    "📌 **ACTION**"
-                )
-
-                st.write(
-                    task.get(
-                        "task",
-                        "No task description"
-                    )
-                )
-
-    else:
-
-        with st.container(border=True):
-
-            st.info(
-                "No tasks detected."
-            )
-
-    st.write("")
-
-    # ========================================================
-    # PROMISES
-    # ========================================================
-
-    st.subheader(
-        "🔗 PROMISE & COMMITMENT INTELLIGENCE"
-    )
-
-    if promises:
-
-        for index, promise in enumerate(
-            promises,
-            start=1
-        ):
-
-            with st.container(border=True):
-
-                st.write(
-                    f"### 🔗 COMMITMENT {index}"
-                )
-
-                col1, col2 = st.columns(2)
-
-                with col1:
-
-                    st.caption(
-                        "👤 PERSON"
-                    )
-
-                    st.write(
-                        promise.get(
-                            "speaker",
-                            "Unknown"
-                        )
-                    )
-
-                with col2:
-
-                    st.caption(
-                        "◈ DEADLINE"
-                    )
-
-                    st.write(
-                        promise.get(
-                            "deadline",
-                            "Not specified"
-                        )
-                    )
-
-                st.write(
-                    "📌 **COMMITMENT**"
-                )
-
-                st.write(
-                    promise.get(
-                        "task",
-                        "No commitment description"
-                    )
-                )
-
-    else:
-
-        with st.container(border=True):
-
-            st.info(
-                "No promises or commitments detected."
-            )
-
-    st.write("")
-
-    # ========================================================
-    # DEADLINES
-    # ========================================================
-
-    st.subheader(
-        "◈ DEADLINE MATRIX"
-    )
-
-    if deadlines:
+    if commitments:
 
         for index, item in enumerate(
-            deadlines,
-            start=1
+            commitments,
+            start=1,
         ):
 
             with st.container(border=True):
 
                 st.write(
-                    f"### ◈ DEADLINE {index}"
+                    f"### {index}. "
+                    f"{item.get('type', 'Commitment')}"
                 )
 
                 st.write(
-                    item.get(
-                        "deadline",
-                        "Not specified"
-                    )
-                )
-
-                st.caption(
-                    "RELATED ACTION"
+                    f"👤 **Speaker:** "
+                    f"{item.get('speaker', 'Unknown')}"
                 )
 
                 st.write(
-                    item.get(
-                        "task",
-                        "Not specified"
-                    )
+                    f"📌 **Action:** "
+                    f"{item.get('task', 'Not specified')}"
+                )
+
+                st.write(
+                    f"◈ **Deadline:** "
+                    f"{item.get('deadline', 'Not specified')}"
                 )
 
     else:
+        st.info("No tasks or promises detected.")
 
-        with st.container(border=True):
+    st.subheader("💡 DECISIONS")
 
-            st.info(
-                "No deadlines detected."
-            )
-
-    st.write("")
-
-    # ========================================================
-    # DECISIONS
-    # ========================================================
-
-    st.subheader(
-        "💡 DECISION SIGNALS"
+    decisions = data.get(
+        "decisions",
+        [],
     )
 
     if decisions:
-
-        for index, decision in enumerate(
-            decisions,
-            start=1
-        ):
-
-            with st.container(border=True):
-
-                st.write(
-                    f"### 💡 DECISION {index}"
-                )
-
-                st.write(decision)
-
+        for decision in decisions:
+            st.write(f"• {decision}")
     else:
+        st.info("No important decisions detected.")
 
-        with st.container(border=True):
+    st.subheader("📥 EXPORT")
 
-            st.info(
-                "No important decisions detected."
+    report = [
+        "NEON MEETING AI",
+        "AI MEETING TO ACTION INTELLIGENCE",
+        "=" * 55,
+        "",
+        "REFERENCE SPEAKER",
+        "-" * 30,
+        str(st.session_state.reference_speaker_name or "Unknown"),
+        "",
+        "SPEAKERS",
+        "-" * 30,
+    ]
+
+    for item in speaker_results:
+        score = item.get("score", -1)
+        if score >= 0:
+            report.append(
+                f"{item.get('speaker_label', 'Speaker')} -> "
+                f"{item.get('name', 'Unknown')} "
+                f"(similarity: {score:.0f}%)"
             )
-
-    st.write("")
-
-    # ========================================================
-    # DOWNLOAD
-    # ========================================================
-
-    with st.container(border=True):
-
-        st.subheader(
-            "📥 EXPORT INTELLIGENCE"
-        )
-
-        download_text = ""
-
-        download_text += (
-            "NEON MEETING AI\n"
-        )
-
-        download_text += (
-            "AI MEETING TO ACTION INTELLIGENCE\n"
-        )
-
-        download_text += "=" * 55
-        download_text += "\n\n"
-
-        download_text += (
-            "MEETING SUMMARY\n"
-        )
-
-        download_text += "-" * 35
-        download_text += "\n"
-
-        download_text += summary
-        download_text += "\n\n"
-
-        # ====================================================
-        # TASKS
-        # ====================================================
-
-        download_text += (
-            "TASKS\n"
-        )
-
-        download_text += "-" * 35
-        download_text += "\n"
-
-        if tasks:
-
-            for index, task in enumerate(
-                tasks,
-                start=1
-            ):
-
-                download_text += (
-                    f"{index}. "
-                    f"{task.get('task', 'N/A')}\n"
-                )
-
-                download_text += (
-                    f"   Person: "
-                    f"{task.get('speaker', 'Unknown')}\n"
-                )
-
-                download_text += (
-                    f"   Deadline: "
-                    f"{task.get('deadline', 'Not specified')}\n\n"
-                )
-
         else:
-
-            download_text += (
-                "No tasks identified.\n\n"
+            report.append(
+                f"{item.get('speaker_label', 'Speaker')} -> Unknown"
             )
 
-        # ====================================================
-        # PROMISES
-        # ====================================================
+    report.extend(
+        [
+            "",
+            "SUMMARY",
+            "-" * 30,
+            data.get("summary", ""),
+            "",
+            "TASKS / PROMISES",
+            "-" * 30,
+        ]
+    )
 
-        download_text += (
-            "PROMISES & COMMITMENTS\n"
+    for item in commitments:
+        report.append(
+            f"{item.get('speaker', 'Unknown')}: "
+            f"{item.get('task', 'Not specified')} | "
+            f"{item.get('deadline', 'Not specified')} | "
+            f"{item.get('type', 'Commitment')}"
         )
 
-        download_text += "-" * 35
-        download_text += "\n"
+    report.extend(
+        [
+            "",
+            "DECISIONS",
+            "-" * 30,
+        ]
+    )
 
-        if promises:
+    report.extend([str(x) for x in decisions])
 
-            for index, promise in enumerate(
-                promises,
-                start=1
-            ):
-
-                download_text += (
-                    f"{index}. "
-                    f"{promise.get('task', 'N/A')}\n"
-                )
-
-                download_text += (
-                    f"   Person: "
-                    f"{promise.get('speaker', 'Unknown')}\n"
-                )
-
-                download_text += (
-                    f"   Deadline: "
-                    f"{promise.get('deadline', 'Not specified')}\n\n"
-                )
-
-        else:
-
-            download_text += (
-                "No promises identified.\n\n"
-            )
-
-        # ====================================================
-        # DECISIONS
-        # ====================================================
-
-        download_text += (
-            "IMPORTANT DECISIONS\n"
-        )
-
-        download_text += "-" * 35
-        download_text += "\n"
-
-        if decisions:
-
-            for index, decision in enumerate(
-                decisions,
-                start=1
-            ):
-
-                download_text += (
-                    f"{index}. {decision}\n"
-                )
-
-        else:
-
-            download_text += (
-                "No important decisions identified.\n"
-            )
-
-        st.download_button(
-            label="⬇️ DOWNLOAD INTELLIGENCE REPORT",
-            data=download_text,
-            file_name="neon_meeting_intelligence.txt",
-            mime="text/plain",
-            use_container_width=True
-        )
-
-    st.write("")
-
-    # ========================================================
-    # NEW ANALYSIS
-    # ========================================================
-
-    if st.button(
-        "⚡ ANALYZE ANOTHER MEETING",
-        type="primary",
-        use_container_width=True
-    ):
-
-        st.session_state.page = 2
-        st.session_state.meeting_data = None
-        st.session_state.audio_name = None
-
-        st.rerun()
+    st.download_button(
+        "⬇️ DOWNLOAD INTELLIGENCE REPORT",
+        data="\n".join(report),
+        file_name="neon_meeting_intelligence.txt",
+        mime="text/plain",
+        use_container_width=True,
+    )
