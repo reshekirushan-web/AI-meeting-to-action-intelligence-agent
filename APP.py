@@ -5,14 +5,12 @@ import base64
 import tempfile
 from pathlib import Path
 from datetime import datetime
-from dotenv import load_dotenv
+
 
 import streamlit as st
 from google import genai
 
-load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
-print("GEMINI_API_KEY:", api_key)
+
 
 # ============================================================
 # CONFIG
