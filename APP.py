@@ -1067,7 +1067,7 @@ Rules:
                 )
 
                 interaction = client.interactions.create(
-                    model="gemini-2.5-flash",
+                    model="gemini-3.8-flash",
                     input=gemini_inputs,
                 )
 
